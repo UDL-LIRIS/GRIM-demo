@@ -1,0 +1,23 @@
+---
+## Zombie pod that has no other purpose than allowing to navigate
+# with a web browser within the directory-tree/files that this volume
+# gathered after being used by some argo workflow (using that PVC) execution.
+# FIXME: the pod get launched but the (nginx) http server won't be visible
+# from anywhere (both intranet and extranet) because PaGoDa doesn't expose it.
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: grim-pvc-nginx-pod
+spec:
+  containers:
+    - name: web-server
+      image: nginx:stable-alpine3.17-slim
+      volumeMounts:
+        - name: mypvc
+          mountPath: /var/lib/www/html
+  volumes:
+    - name: mypvc
+      persistentVolumeClaim:
+        claimName: grim-pvc
+        readOnly: false

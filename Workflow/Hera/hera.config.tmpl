@@ -1,0 +1,16 @@
+# Hera_utils configuration file: volume related additionnal information.
+# File format: Python configparser shlex (unix shell like), refer to e.g.
+#  * configparser: https://docs.python.org/3/library/configparser.html
+#  * Shlex: https://docs.python.org/3/library/shlex.html#module-shlex
+
+# The bare required minimum 
+k8s_config_file='<absolute-path-to>/some-rke-file.yaml'
+argo_server='argowf.my-domain.org:443' 
+argo_namespace='argo'
+argo_service_account='argo-user'
+
+# Extension: define a volume claim that shall be used by the workflow 
+k8s_volume_claim_name='<some-volume-claim-name>'
+# The optional configuration map as set by the k8s admin (useful to provide
+# cluster specific configuration elements like the HTTP_PROXY)
+k8s_configmap_name='hera-utils-proxy-environment'

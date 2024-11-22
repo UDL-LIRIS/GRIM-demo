@@ -1,0 +1,15 @@
+---
+# In the PAGoDA cluster context, there is no need to define the underlying Persistent
+# Volume of the following PVC. This is because the the PV will be automagically
+# created by the platform (FIXME: document the mechanism).
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: grim-pvc
+spec:
+  accessModes:
+    - ReadWriteMany
+  resources:
+    requests:
+      storage: 10Gi
+  storageClassName: csi-manila-nfs

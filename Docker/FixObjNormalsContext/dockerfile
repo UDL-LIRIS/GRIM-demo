@@ -1,0 +1,4 @@
+FROM python:3.13.0
+
+COPY fix_OBJ_normals_for_MEPP2.py .
+CMD [ "python", "fix_OBJ_normals_for_MEPP2.py" ]

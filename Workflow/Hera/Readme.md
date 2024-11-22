@@ -1,0 +1,145 @@
+# An Hera based version of the GRIM project workflow<!-- omit from toc -->
+
+## Table of contents<!-- omit from toc -->
+
+- [Installation](#installation)
+- [Building and pushing the container images to a registry](#building-and-pushing-the-container-images-to-a-registry)
+- [Allocating cluster level Workflow ressources](#allocating-cluster-level-workflow-ressources)
+- [Running the workflow](#running-the-workflow)
+- [Accessing results](#accessing-results)
+- [References](#references)
+
+## Installation
+
+Note: although the usage of a [(python) virtual environment](https://packaging.python.org/en/latest/guides/installing-using-pip-and-virtual-environments/) is recommandable it remains optional
+
+```bash
+cd `git rev-parse --show-toplevel`/Workflow/Hera
+python3.10 -m venv venv
+source venv/bin/activate
+pip3 install -r requirements.txt         # Instal dependencies
+```
+
+Copy the [`hera.config.tmpl`](./hera.config.tmpl) to `hera.config` and configure that file to your ArgoWorkflows server.
+
+Quick checks of the installation
+
+```bash
+python -c "import hera_k8s_utils"      # Checking the hera_k8s_utils dependency
+python test_environment.py             # Test AW server with handshake 
+```
+
+## Building and pushing the container images to a registry
+
+FIXME: clean up or document the `docker compose build` option that can be useful for building in a minikube context.
+
+```bash
+export REGISTRY=harbor.pagoda.os.univ-lyon1.fr
+export ORGANISATION=vcity
+# Adapt to your platform (cross building not always needed)
+alias docker_build="docker buildx build --platform=linux/amd64"
+# Login to the platform docker registry
+docker login ${REGISTRY}/${ORGANISATION} --username <my-username>
+```
+
+```bash
+docker_build -t ${ORGANISATION}/fixobjnormals:1.0              $(git rev-parse --show-toplevel)/Docker/FixObjNormalsContext
+```
+
+```bash
+# Building images
+docker_build -t ${ORGANISATION}/ribs:1.0                       https://github.com/VCityTeam/TT-Ribs.git -f Docker/Dockerfile
+docker_build -t ${ORGANISATION}/fixobjnormals:1.0              `git rev-parse --show-toplevel`/Docker/FixObjNormalsContext
+docker_build -t ${ORGANISATION}/py3dtiles:v7.0.0               https://gitlab.com/py3dtiles/py3dtiles.git#v7.0.0 -f docker/Dockerfile
+docker_build -t ${ORGANISATION}/py3dtilers:1.0                 https://github.com/VCityTeam/py3dtilers-docker.git -f Context/Dockerfile
+docker_build -t ${ORGANISATION}/offsetthreedtilesettolyon:1.0  https://github.com/VCityTeam/UD-Reproducibility.git#master:Computations/3DTiles/Ribs/OffsetTilesetContext
+```
+
+```bash
+# Tagging for the registry
+docker tag ${ORGANISATION}/ribs:1.0                       ${REGISTRY}/${ORGANISATION}/ribs:1.0
+docker tag ${ORGANISATION}/fixobjnormals:1.0              ${REGISTRY}/${ORGANISATION}/fixobjnormals:1.0
+docker tag ${ORGANISATION}/py3dtiles:v7.0.0               ${REGISTRY}/${ORGANISATION}/py3dtiles:1.0
+docker tag ${ORGANISATION}/py3dtilers:1.0                 ${REGISTRY}/${ORGANISATION}/py3dtilers:1.0
+docker tag ${ORGANISATION}/offsetthreedtilesettolyon:1.0  ${REGISTRY}/${ORGANISATION}/offsetthreedtilesettolyon:1.0
+```
+
+```bash
+# Publishing to the registry
+docker push ${REGISTRY}/${ORGANISATION}/ribs:1.0
+docker push ${REGISTRY}/${ORGANISATION}/fixobjnormals:1.0
+docker push ${REGISTRY}/${ORGANISATION}/py3dtiles:1.0
+docker push ${REGISTRY}/${ORGANISATION}/py3dtilers:1.0
+docker push ${REGISTRY}/${ORGANISATION}/offsetthreedtilesettolyon:1.0
+```
+
+## Allocating cluster level Workflow ressources
+
+```bash
+cd $(git rev-parse --show-cdup)//Workflow/Hera
+# Reminder for the workspace setting
+kubectl config set-context --current --namespace=argo-dev
+# Creation of the workflow I/O placeholder (including results)
+kubectl apply -f define_pvc_pagoda.yaml
+# Assert volume was properly created (the name grim-pvc comes from
+# define_pvc_pagoda.yaml):
+kubectl get pvc grim-pvc
+```
+
+## Running the workflow
+
+```bash
+cd $(git rev-parse --show-toplevel)/Workflow/Hera
+python grim_workflow.py
+```
+
+## Accessing results
+
+Set your namespace
+
+```bash
+kubectl config set-context --current --namespace=argo-dev
+```
+
+One can
+
+- either browse the results (at shell level) from within an ad-hoc container
+  with (refer to [the header](define_zombie_pod_for_PV_navigation_with_bash.yaml)
+  for further details)
+
+  ```bash
+  cd $(git rev-parse --show-toplevel)/Workflow/Hera
+  # Create pod
+  k apply -f define_zombie_pod_for_PV_navigation_with_bash.yaml
+  # Assert pod was created
+  k get pod grim-pvc-ubuntu-pod
+  k exec -it grim-pvc-ubuntu-pod -- bash
+  # And then `cd /grim-data/` and navigate the directory tree with bash...
+  ```
+
+  Eventually (when the work session is over), free the allocated pod
+
+  ```bash
+  k delete -f define_zombie_pod_for_PV_navigation_with_bash.yaml
+  ```
+
+- or copy the results to the commanding desktop with the following commands
+
+  ```bash
+  cd $(git rev-parse --show-cdup)/Workflow/Hera
+  k apply -f define_zombie_pod_for_PV_navigation_with_browser.yaml
+  kubectl -n cp -r grim-pvc-nginx-pod:/var/lib/www/html/junk/ junk
+  k delete -f define_zombie_pod_for_PV_navigation_with_browser.yaml
+  ```
+
+  When the pod deletion fails (and appears with "Terminating" status in
+  `k get pods`) then forcing the deletion can be done with
+
+  ```bash
+  k delete pod grim-pvc-ubuntu-pod --force
+  ```
+
+## References
+
+- [Using the ribs tool with docker](https://github.com/VCityTeam/TT-Ribs/tree/master/Docker).
+  Examples of [usage of the ribs tool](https://github.com/VCityTeam/UD-Reproducibility/blob/master/Computations/3DTiles/Ribs/Readme.md).

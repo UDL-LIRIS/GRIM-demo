@@ -1,0 +1,23 @@
+FROM mtola/ubuntu-22.04-cgal_5.x.y-pcl_1.1x.y-mepp2
+
+#RUN  git clone https://github.com/MEPP-team/MEPP2 \
+#     && cd MEPP2 \
+#     && git checkout d977d05
+RUN  git clone https://GRIMRO:Uw2szxJvAFziSsEvx3h4@gitlab.liris.cnrs.fr/MEPP-team/MEPP2.git \
+     && cd MEPP2 \
+     && git checkout 28289499   # branch vvi-master-dev-pc
+RUN  cd MEPP2 && mkdir build && cd build \
+     && cmake -DBUILD_USE_CGAL=ON -DBUILD_USE_OPENMESH=ON -DBUILD_USE_QT5=ON -DBUILD_USE_GUI=ON -DBUILD_USE_PCL=ON -DBUILD_USE_DRACO=ON -DCMAKE_BUILD_TYPE=Release .. \
+     && make -j 1
+RUN  cd /root/CGAL-5.5/examples/Polygon_mesh_processing \
+     && mkdir build && cd build \
+     && export CGAL_DIR=/root/CGAL-5.5 \
+     && cmake -DCMAKE_BUILD_TYPE=Release .. \
+     && make triangulate_faces_example
+RUN  chmod a+rx /root
+     
+# create user for GUI
+RUN  useradd --uid 1002 graphimage
+USER graphimage
+WORKDIR /MEPP2/build/Visualization/Applications
+

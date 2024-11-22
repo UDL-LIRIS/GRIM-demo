@@ -1,0 +1,5 @@
+hera_utils @ git+https://github.com/VCityTeam/hera_utils
+hera_k8s_utils @ git+https://github.com/VCityTeam/hera_k8s_utils
+docker_helper @ git+https://github.com/VCityTeam/docker-helper-py
+hera >= 5.6.0
+pyyaml

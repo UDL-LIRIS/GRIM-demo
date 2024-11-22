@@ -1,0 +1,117 @@
+# Notes:
+# 1. within the build field
+#    - the context dir path is relative to the docker-compose file
+#    - but the dockerfile path is relative to context dir !
+# 2. Host volume path is relative to the docker-compose file
+
+services:
+
+  ################################# Computational pipeline
+  #### MEPP2 geometric computations
+  mepp2:
+    build:
+      context: Docker/Mepp2
+      platforms:
+        - "linux/amd64"
+    image: grim/mepp2.img
+    volumes:
+    - ../datademo:/datademo
+    container_name: mepp2
+    restart: on-failure
+
+  #### DGTAL geometric computations
+  dgtal:
+    build:
+      context: Docker/DgtalContext
+      platforms:
+        - "linux/amd64"
+    image: grim/dgtal.img
+    volumes:
+    - ../datademo:/datademo
+    container_name: dgtal
+    restart: on-failure
+
+  ##### 3DTiles tiler
+  py3dtilers:
+    build:
+      context: https://github.com/VCityTeam/py3dtilers-docker.git
+      dockerfile: Context/Dockerfile
+      platforms:
+        - "linux/amd64"
+    image: grim/py3dtilers.img
+    volumes:
+    - ../datademo:/datademo
+    container_name: py3dtilers
+    restart: on-failure
+
+  ######################## Visualizing pipeline results
+  #### http servicing of resulting 3DTiles (for front-end consumption)
+  3dtiles-server:
+    build:
+      context: Docker/ThreeDTilesSamplesContext
+    image: grim/3dtiles-server.img
+    container_name: 3dtiles-server
+    volumes:
+      - /home/graphimage/datademo/lods_3dtiles:/3d-tiles-samples/tilesets
+    ports:
+      - 8001:8003
+
+  #### TunNetView web frontend
+  tunnetview:
+    build:
+      context: https://github.com/VCityTeam/TunNetView-docker.git
+      dockerfile: Context/Dockerfile
+      #args:
+      #  # version of 09/10/2024 (bugged)
+      #  checkoutName: 946200dbb3faa7bfbd1fc812a0dfd01ed7ff0743
+      #args:
+      #  # version of 15/10/2024 (bugged)
+      #  checkoutName: 0543ca45e61cd36297144bd141d4d88565df3f9d
+      args:
+        # version of 22/10/2024
+        checkoutName: cf11507d1606982d9f29a93e5816dcc1d5ede8ad
+    image: grim/tunnetview.img
+    container_name: tunnetview
+    ports:
+      - 8000:8000
+    environment:
+      PORT: 8000
+      SYNTHETIC_CAVE_URL: "http://graphiqueetimage.liris.cnrs.fr:8001/tilesets/tileset.json"
+
+  ################################## Debugging tools
+  ####  Tools for debugging intermediate pipeline results
+  # mepp-on-line backend
+  mepponline-server:
+    build:
+      context: ./MEPP2-online
+      dockerfile: Docker/dockerfile.mepp-server
+    image: grim/mepponline-server_u2004_img
+    ports:
+      - 8080:8080
+    volumes:
+      - ../datademo/MOL:/home/user1/meppsrv_tmp
+    container_name: mepponline-server
+    init: true
+    restart: on-failure
+    profiles: ['debug']
+
+  #### mepp-on-line frontend for 
+  mepponline-nginx:
+    build:
+      context: ./MEPP2-online/Src/mepp-jsclient
+      dockerfile: ../../Docker/dockerfile.nginx
+    image: grim/mepponline-nginx_u2004_img
+    container_name: mepponline-nginx
+    ports:
+      - 80:80
+    volumes:
+      - ../datademo/MOL:/var/www/files:ro
+    restart: on-failure
+    profiles: ['debug']
+    depends_on:
+      - mepponline-server
+
+networks:
+  default:
+    name: grim_net
+

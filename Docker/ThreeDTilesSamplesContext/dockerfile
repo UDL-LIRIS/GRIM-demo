@@ -1,0 +1,17 @@
+FROM node:latest
+
+LABEL maintainer "VCityTeam"
+
+RUN apt-get update
+RUN apt-get install -y git
+RUN apt-get install -y wget
+
+RUN git clone https://github.com/AnalyticalGraphicsInc/3d-tiles-samples
+WORKDIR /3d-tiles-samples
+RUN git reset --hard 1901e7ed563c6efc59888237ca56807a759e269f
+
+WORKDIR /3d-tiles-samples/
+RUN npm install
+EXPOSE 8003
+CMD [ "npm", "start", "--", "--public"]
+
