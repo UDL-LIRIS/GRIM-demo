@@ -8,8 +8,8 @@ metadata:
   name: grim-pvc
 spec:
   accessModes:
-    - ReadWriteMany
+    - ReadWriteOnce
   resources:
     requests:
       storage: 10Gi
-  storageClassName: csi-manila-nfs
+  storageClassName: ceph-rbd
