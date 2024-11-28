@@ -1,8 +1,13 @@
+# To be used with "docker compose" command (as opposed to docker-compose)
+#
 # Notes:
-# 1. within the build field
+# - within the build field
 #    - the context dir path is relative to the docker-compose file
 #    - but the dockerfile path is relative to context dir !
-# 2. Host volume path is relative to the docker-compose file
+# - Host volume path is relative to the docker-compose file
+# - when a container is arch dependent a "platforms" is mandatory
+# - containers flagged with a 'debug' profiles are proprietary unpublished
+#   code. By default profiled containers are not build by docker compose.
 
 services:
 
@@ -10,7 +15,7 @@ services:
   #### MEPP2 geometric computations
   mepp2:
     build:
-      context: Docker/Mepp2
+      context: Docker/Mepp2Context
       platforms:
         - "linux/amd64"
     image: grim/mepp2.img
@@ -95,7 +100,7 @@ services:
     restart: on-failure
     profiles: ['debug']
 
-  #### mepp-on-line frontend for 
+  # mepp-on-line frontend 
   mepponline-nginx:
     build:
       context: ./MEPP2-online/Src/mepp-jsclient
