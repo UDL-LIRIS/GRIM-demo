@@ -1,0 +1,4 @@
+FROM python:3.13.0
+
+COPY convert_sdp_to_obj.py .
+ENTRYPOINT [ "python", "convert_sdp_to_obj.py" ]

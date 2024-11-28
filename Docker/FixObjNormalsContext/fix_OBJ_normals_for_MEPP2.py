@@ -56,4 +56,3 @@ else:
                 done = True
             outfile.write(line)
 
-

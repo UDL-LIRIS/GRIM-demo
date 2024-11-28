@@ -1,0 +1,4 @@
+FROM python:3.13.0
+
+COPY obj_to_obj_scale_offset.py .
+ENTRYPOINT [ "python", "obj_to_obj_scale_offset.py" ]
