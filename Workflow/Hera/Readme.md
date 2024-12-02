@@ -35,15 +35,12 @@ FIXME: clean up or document the `docker compose build` option that can be useful
 
 ```bash
 export REGISTRY=harbor.pagoda.os.univ-lyon1.fr
-export ORGANISATION=vcity
+export REGISTRY_GROUP=vcity
+export ORGANISATION=${REGISTRY_GROUP}/grim
 # Adapt to your platform (cross building not always needed)
 alias docker_build="docker buildx build --platform=linux/amd64"
 # Login to the platform docker registry
-docker login ${REGISTRY}/${ORGANISATION} --username <my-username>
-```
-
-```bash
-docker_build -t ${ORGANISATION}/fixobjnormals:1.0              $(git rev-parse --show-toplevel)/Docker/FixObjNormalsContext
+docker login ${REGISTRY}/${REGISTRY_GROUP} --username <my-username>
 ```
 
 ```bash
@@ -51,8 +48,9 @@ docker_build -t ${ORGANISATION}/fixobjnormals:1.0              $(git rev-parse -
 docker_build -t ${ORGANISATION}/ribs:1.0                       https://github.com/VCityTeam/TT-Ribs.git -f Docker/Dockerfile
 docker_build -t ${ORGANISATION}/fixobjnormals:1.0              `git rev-parse --show-toplevel`/Docker/FixObjNormalsContext
 docker_build -t ${ORGANISATION}/py3dtiles:v7.0.0               https://gitlab.com/py3dtiles/py3dtiles.git#v7.0.0 -f docker/Dockerfile
-docker_build -t ${ORGANISATION}/py3dtilers:1.0                 https://github.com/VCityTeam/py3dtilers-docker.git -f Context/Dockerfile
+docker_build -t ${ORGANISATION}/py3dtilers:1.0                 `git rev-parse --show-toplevel`/Docker/Py3dtilerContext
 docker_build -t ${ORGANISATION}/offsetthreedtilesettolyon:1.0  https://github.com/VCityTeam/UD-Reproducibility.git#master:Computations/3DTiles/Ribs/OffsetTilesetContext
+docker_build -t ${ORGANISATION}/mepp2:1.0                      `git rev-parse --show-toplevel`/Docker/Mepp2Context
 ```
 
 ```bash
@@ -62,6 +60,7 @@ docker tag ${ORGANISATION}/fixobjnormals:1.0              ${REGISTRY}/${ORGANISA
 docker tag ${ORGANISATION}/py3dtiles:v7.0.0               ${REGISTRY}/${ORGANISATION}/py3dtiles:1.0
 docker tag ${ORGANISATION}/py3dtilers:1.0                 ${REGISTRY}/${ORGANISATION}/py3dtilers:1.0
 docker tag ${ORGANISATION}/offsetthreedtilesettolyon:1.0  ${REGISTRY}/${ORGANISATION}/offsetthreedtilesettolyon:1.0
+docker tag ${ORGANISATION}/mepp2:1.0                      ${REGISTRY}/${ORGANISATION}/mepp2:1.0
 ```
 
 ```bash
@@ -71,6 +70,7 @@ docker push ${REGISTRY}/${ORGANISATION}/fixobjnormals:1.0
 docker push ${REGISTRY}/${ORGANISATION}/py3dtiles:1.0
 docker push ${REGISTRY}/${ORGANISATION}/py3dtilers:1.0
 docker push ${REGISTRY}/${ORGANISATION}/offsetthreedtilesettolyon:1.0
+docker push ${REGISTRY}/${ORGANISATION}/mepp2:1.0
 ```
 
 ## Allocating cluster level Workflow ressources

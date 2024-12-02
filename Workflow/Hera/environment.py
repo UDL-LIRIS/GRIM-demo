@@ -17,8 +17,8 @@ class environment(num_exp_environment):
 
         # The information that are "close/related" to runtime cluster.
         self.cluster = types.SimpleNamespace(
-            docker_registry="harbor.pagoda.os.univ-lyon1.fr",
-            docker_organisation="vcity",
+            docker_registry="harbor.pagoda.os.univ-lyon1.fr/vcity",
+            docker_organisation="grim",
             configmap=args.k8s_configmap_name,
         )
 
