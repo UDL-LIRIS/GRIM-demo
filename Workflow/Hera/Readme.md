@@ -51,6 +51,7 @@ docker_build -t ${ORGANISATION}/py3dtiles:v7.0.0               https://gitlab.co
 docker_build -t ${ORGANISATION}/py3dtilers:1.0                 `git rev-parse --show-toplevel`/Docker/Py3dtilerContext
 docker_build -t ${ORGANISATION}/offsetthreedtilesettolyon:1.0  https://github.com/VCityTeam/UD-Reproducibility.git#master:Computations/3DTiles/Ribs/OffsetTilesetContext
 docker_build -t ${ORGANISATION}/mepp2:1.0                      `git rev-parse --show-toplevel`/Docker/Mepp2Context
+docker_build -t ${ORGANISATION}/dgtal:1.0                      `git rev-parse --show-toplevel`/Docker/DgtalContext
 ```
 
 ```bash
@@ -61,6 +62,7 @@ docker tag ${ORGANISATION}/py3dtiles:v7.0.0               ${REGISTRY}/${ORGANISA
 docker tag ${ORGANISATION}/py3dtilers:1.0                 ${REGISTRY}/${ORGANISATION}/py3dtilers:1.0
 docker tag ${ORGANISATION}/offsetthreedtilesettolyon:1.0  ${REGISTRY}/${ORGANISATION}/offsetthreedtilesettolyon:1.0
 docker tag ${ORGANISATION}/mepp2:1.0                      ${REGISTRY}/${ORGANISATION}/mepp2:1.0
+docker tag ${ORGANISATION}/dgtal:1.0                      ${REGISTRY}/${ORGANISATION}/dgtal:1.0
 ```
 
 ```bash
@@ -71,6 +73,7 @@ docker push ${REGISTRY}/${ORGANISATION}/py3dtiles:1.0
 docker push ${REGISTRY}/${ORGANISATION}/py3dtilers:1.0
 docker push ${REGISTRY}/${ORGANISATION}/offsetthreedtilesettolyon:1.0
 docker push ${REGISTRY}/${ORGANISATION}/mepp2:1.0
+docker push ${REGISTRY}/${ORGANISATION}/dgtal:1.0
 ```
 
 ## Allocating cluster level Workflow ressources

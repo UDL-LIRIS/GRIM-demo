@@ -9,5 +9,6 @@ inputs = types.SimpleNamespace(
     parameters=types.SimpleNamespace(
         # Parameters vary independently from one another
         subdivision_level=1,
+        mesh2vol_resolution=100,  # 100 for cave and 300 for tunnels
     ),
 )
