@@ -138,6 +138,78 @@ if __name__ == "__main__":
             volumes=[volume],
         )
 
+        dgtal_from_hollow_to_filled_vol = Container(
+            name="dgtal-from-hollow-to-filled-vol",
+            inputs=[
+                Parameter(name="input_file"),
+                Parameter(name="output_file"),
+            ],
+            image=environment.cluster.docker_registry
+            + "/"
+            + environment.cluster.docker_organisation
+            + "/"
+            + "dgtal:1.0",
+            image_pull_policy=models.ImagePullPolicy.always,
+            command=[
+                "/home/digital/git/DGtalTools/build/volumetric/volFillInterior",
+                "-i",
+                "{{inputs.parameters.input_file}}",
+                "-o",
+                "{{inputs.parameters.output_file}}",
+            ],
+            volumes=[volume],
+        )
+
+        dgtal_from_vol_to_raw_obj = Container(
+            name="dgtal-from-vol-to-raw-obj",
+            inputs=[
+                Parameter(name="input_file"),
+                Parameter(name="output_file"),
+            ],
+            image=environment.cluster.docker_registry
+            + "/"
+            + environment.cluster.docker_organisation
+            + "/"
+            + "dgtal:1.0",
+            image_pull_policy=models.ImagePullPolicy.always,
+            command=[
+                "/home/digital/git/DGtalTools/build/converters/vol2obj",
+                "-i",
+                "{{inputs.parameters.input_file}}",
+                "-o",
+                "{{inputs.parameters.output_file}}",
+            ],
+            volumes=[volume],
+        )
+
+        dgtal_from_vol_to_sdp = Container(
+            name="dgtal-from-vol-to-sdp",
+            inputs=[
+                Parameter(name="input_file"),
+                Parameter(name="output_file"),
+            ],
+            image=environment.cluster.docker_registry
+            + "/"
+            + environment.cluster.docker_organisation
+            + "/"
+            + "dgtal:1.0",
+            image_pull_policy=models.ImagePullPolicy.always,
+            command=[
+                "criticalKernelsThinning3D",
+                "--input",
+                "{{inputs.parameters.input_file}}",
+                "--select",
+                "dmax",
+                "--skel",
+                "1isthmus",
+                "--persistence",
+                "1",
+                "-e",
+                "{{inputs.parameters.output_file}}",
+            ],
+            volumes=[volume],
+        )
+
         with DAG(name="main"):
             t1 = create_directory(
                 name="create-directory-blender-generate",
@@ -225,5 +297,53 @@ if __name__ == "__main__":
                 }
             )
             t6 >> t7 >> t8
+
+            t9 = create_directory(
+                name="create-directory-dgtal-from-hollow-to-filled-vol",
+                arguments={
+                    "directory_to_create": layout.from_hollow_to_filled_vol_stage_output_dir(),
+                    "claim_name": environment.persisted_volume.claim_name,
+                    "mount_path": environment.persisted_volume.mount_path,
+                },
+            )
+            t10 = dgtal_from_hollow_to_filled_vol(
+                arguments={
+                    "input_file": layout.from_off_to_hollow_vol_stage_output_filename(),
+                    "output_file": layout.from_hollow_to_filled_vol_stage_output_filename(),
+                }
+            )
+            t8 >> t9 >> t10
+
+            t11 = create_directory(
+                name="create-directory-dgtal-from-vol-to-raw-obj",
+                arguments={
+                    "directory_to_create": layout.from_vol_to_raw_obj_stage_output_dir(),
+                    "claim_name": environment.persisted_volume.claim_name,
+                    "mount_path": environment.persisted_volume.mount_path,
+                },
+            )
+            t12 = dgtal_from_vol_to_raw_obj(
+                arguments={
+                    "input_file": layout.from_hollow_to_filled_vol_stage_output_filename(),
+                    "output_file": layout.from_vol_to_raw_obj_stage_output_filename(),
+                }
+            )
+            t10 >> t11 >> t12
+
+            t13 = create_directory(
+                name="create-directory-dgtal-from-vol-to-sdp",
+                arguments={
+                    "directory_to_create": layout.from_vol_to_sdp_stage_output_dir(),
+                    "claim_name": environment.persisted_volume.claim_name,
+                    "mount_path": environment.persisted_volume.mount_path,
+                },
+            )
+            t14 = dgtal_from_vol_to_sdp(
+                arguments={
+                    "input_file": layout.from_hollow_to_filled_vol_stage_output_filename(),
+                    "output_file": layout.from_vol_to_raw_obj_stage_output_filename(),
+                }
+            )
+            t10 >> t13 >> t14
 
     w.create()

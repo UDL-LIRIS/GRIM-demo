@@ -43,7 +43,7 @@ class layout:
 
     ###### Step 1: DGTAL (well mainly)
     def convert_obj_to_off_stage_output_dir(self):
-        return self.stage_output_dir("stage_1_0_convert_to_OFF")
+        return self.stage_output_dir("stage_1_1_0_convert_to_OFF")
 
     def convert_obj_to_off_stage_output_filename(self):
         input_filename = self.fix_obj_normals_stage_output_filename()
@@ -53,10 +53,40 @@ class layout:
 
     ### Off to hollow VOL
     def from_off_to_hollow_vol_stage_output_dir(self):
-        return self.stage_output_dir("stage_1_1_convert_OFF_to_hollow_VOL")
+        return self.stage_output_dir("stage_1_1_1_from_OFF_to_hollow_VOL")
 
     def from_off_to_hollow_vol_stage_output_filename(self):
         input_filename = self.convert_obj_to_off_stage_output_filename()
         stem_filename = Path(input_filename).stem
         filename = stem_filename + "_hollow.vol"
         return os.path.join(self.from_off_to_hollow_vol_stage_output_dir(), filename)
+
+    ### Hollow VOL to filled VOL
+    def from_hollow_to_filled_vol_stage_output_dir(self):
+        return self.stage_output_dir("stage_1_1_2_from_hollow_to_filled_VOL")
+
+    def from_hollow_to_filled_vol_stage_output_filename(self):
+        input_filename = self.from_off_to_hollow_vol_stage_output_filename()
+        stem_filename = Path(input_filename).stem
+        filename = stem_filename.replace("_hollow", "_filled") + ".vol"
+        return os.path.join(self.from_hollow_to_filled_vol_stage_output_dir(), filename)
+
+    ### VOL to raw OBJ (for intermediate visualization)
+    def from_vol_to_raw_obj_stage_output_dir(self):
+        return self.stage_output_dir("stage_1_1_3_from_vol_to_raw_VOL")
+
+    def from_vol_to_raw_obj_stage_output_filename(self):
+        input_filename = self.from_hollow_to_filled_vol_stage_output_filename()
+        stem_filename = Path(input_filename).stem
+        filename = stem_filename.replace("_filled", "_voxels") + ".obj"
+        return os.path.join(self.from_vol_to_raw_obj_stage_output_dir(), filename)
+
+    ### VOL to SDP (extract median axis)
+    def from_vol_to_sdp_stage_output_dir(self):
+        return self.stage_output_dir("stage_1_2_from_vol_to_SDP")
+
+    def from_vol_to_raw_obj_stage_output_filename(self):
+        input_filename = self.from_hollow_to_filled_vol_stage_output_filename()
+        stem_filename = Path(input_filename).stem
+        filename = stem_filename + ".sdp"
+        return os.path.join(self.from_vol_to_sdp_stage_output_dir(), filename)
