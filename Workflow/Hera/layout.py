@@ -61,6 +61,11 @@ class layout:
         filename = stem_filename + "_hollow.vol"
         return os.path.join(self.from_off_to_hollow_vol_stage_output_dir(), filename)
 
+    def from_off_to_hollow_vol_stage_log_filename(self):
+        return os.path.join(
+            self.from_off_to_hollow_vol_stage_output_dir(), "mesh2vol.log"
+        )
+
     ### Hollow VOL to filled VOL
     def from_hollow_to_filled_vol_stage_output_dir(self):
         return self.stage_output_dir("stage_1_1_2_from_hollow_to_filled_VOL")

@@ -5,6 +5,8 @@ if __name__ == "__main__":
     from environment import environment
     from inputs import inputs
     from script_create_directory import create_directory
+    from script_debug import debug
+    from script_extract_mesh2vol_outputs import extract_mesh2vol_outputs
 
     # A workflow that tests whether the defined environment is correct as
     # seen and used from within the Argo server engine (at Workflow runtime)
@@ -96,9 +98,9 @@ if __name__ == "__main__":
                 # compare the result with). But we have no such file, and
                 # providing the result file as comparison file will also fail
                 # since the test expects the third argument to be the filename
-                # of file with a ".coff" extension (when the result has an ".off"
-                # extension). We thus provide a dummy filename for the test to
-                # accept to start and realize the first part of its job which
+                # of file with ".coff" file format when the result has is in a
+                # ".cnoff" format. We thus provide a dummy filename for the test
+                # to accept to start and realize the first part of its job which
                 # is to compute some off output file.
                 # But then the comparison (between the output off file and the
                 # un-existing dummy file) that the tests realizes will fail.
@@ -114,6 +116,33 @@ if __name__ == "__main__":
             volumes=[volume],
         )
 
+        mes2vol_command = (
+            "/home/digital/git/DGtalTools/build/converters/mesh2vol "
+            + "-i {{inputs.parameters.input_file}} "
+            + "-o {{inputs.parameters.output_file}} "
+            + "-r "
+            + str(inputs.parameters.mesh2vol_resolution)
+            # Black magic (following) line:
+            # - mesh2vol log outputs are routed to stderr,
+            # - yet running the same command, but without the stderr redirection
+            #   to stdout, with docker -t will still produce a mesh2vol.log with
+            #   some content (because the -t option regroups stderr with stdout),
+            # - but running that command (still without the stderr redirection
+            #   to stdout) over Kubernetes will produce an empty mesh2vol.log
+            #   file.
+            # - yet if one adds the stderr redirection to stdout, then even over
+            #   Kubernetes the mesh2vol.log file will the proper content.
+            + " 2>&1 "
+            # The workflow needs to extract some parameters (required as input
+            # to some downstream Tasks) from the logs. We thus tee in order
+            # to have both the AW logs and an output file that the workflow
+            # can use
+            + "| tee "
+            + os.path.join(
+                layout.from_off_to_hollow_vol_stage_output_dir(), "mesh2vol.log"
+            )
+        )
+
         dgtal_from_off_to_hollow_vol = Container(
             name="dgtal-from-off-to-hollow-vol",
             inputs=[
@@ -127,13 +156,13 @@ if __name__ == "__main__":
             + "dgtal:1.0",
             image_pull_policy=models.ImagePullPolicy.always,
             command=[
-                "/home/digital/git/DGtalTools/build/converters/mesh2vol",
-                "-i",
-                "{{inputs.parameters.input_file}}",
-                "-o",
-                "{{inputs.parameters.output_file}}",
-                "-r",
-                inputs.parameters.mesh2vol_resolution,
+                # We need to redirect the standard output of the mesh2vol filter
+                # to a file in order to extract the scaling factor and the offset.
+                # For this we use the shell pipe mechanism together with a tee
+                # trick
+                "bash",
+                "-c",
+                mes2vol_command,
             ],
             volumes=[volume],
         )
@@ -291,10 +320,11 @@ if __name__ == "__main__":
                 },
             )
             t8 = dgtal_from_off_to_hollow_vol(
+                name="mesh2vol",
                 arguments={
                     "input_file": layout.convert_obj_to_off_stage_output_filename(),
                     "output_file": layout.from_off_to_hollow_vol_stage_output_filename(),
-                }
+                },
             )
             t6 >> t7 >> t8
 
@@ -310,7 +340,7 @@ if __name__ == "__main__":
                 arguments={
                     "input_file": layout.from_off_to_hollow_vol_stage_output_filename(),
                     "output_file": layout.from_hollow_to_filled_vol_stage_output_filename(),
-                }
+                },
             )
             t8 >> t9 >> t10
 
@@ -345,5 +375,18 @@ if __name__ == "__main__":
                 }
             )
             t10 >> t13 >> t14
+
+            # Rescaling the SDP
+            t9_b_1 = extract_mesh2vol_outputs(
+                name="mesh2vol-log",
+                arguments={
+                    "log_filename": layout.from_off_to_hollow_vol_stage_log_filename(),
+                    "claim_name": environment.persisted_volume.claim_name,
+                    "mount_path": environment.persisted_volume.mount_path,
+                },
+            )
+
+            t9_b_2 = debug(arguments=t9_b_1.get_parameter("scale").with_name("message"))
+            t8 >> t9_b_1 >> t9_b_2
 
     w.create()
