@@ -78,7 +78,7 @@ if __name__ == "__main__":
             volumes=[volume],
         )
         mepp2_convert_obj_to_off = Container(
-            name="mepp2-convert-obj-to-ff",
+            name="mepp2-convert-obj-to-off",
             inputs=[
                 Parameter(name="input_file"),
                 Parameter(name="output_file"),
@@ -239,8 +239,89 @@ if __name__ == "__main__":
             volumes=[volume],
         )
 
+        convert_sdp_to_obj = Container(
+            name="convert-sdp-to-obj",
+            inputs=[
+                Parameter(name="input_file"),
+                Parameter(name="output_file"),
+            ],
+            image=environment.cluster.docker_registry
+            + "/"
+            + environment.cluster.docker_organisation
+            + "/"
+            + "convertsdptoobj:1.0",
+            image_pull_policy=models.ImagePullPolicy.always,
+            command=[
+                "python3",
+                "convert_sdp_to_obj.py",
+                "--input_file",
+                "{{inputs.parameters.input_file}}",
+                "--output_file",
+                "{{inputs.parameters.output_file}}",
+            ],
+            volumes=[volume],
+        )
+
+        obj_to_obj_scale_offset = Container(
+            name="obj-to-obj-scale-offset",
+            inputs=[
+                Parameter(name="scale"),
+                Parameter(name="offset_x"),
+                Parameter(name="offset_y"),
+                Parameter(name="offset_z"),
+                Parameter(name="input_file"),
+                Parameter(name="output_file"),
+            ],
+            image=environment.cluster.docker_registry
+            + "/"
+            + environment.cluster.docker_organisation
+            + "/"
+            + "objtoobjscaleoffset:1.0",
+            image_pull_policy=models.ImagePullPolicy.always,
+            command=[
+                "python3",
+                "obj_to_obj_scale_offset.py",
+                "--scale",
+                "{{inputs.parameters.scale}}",
+                "--offset_x",
+                "{{inputs.parameters.offset_x}}",
+                "--offset_y",
+                "{{inputs.parameters.offset_y}}",
+                "--offset_z",
+                "{{inputs.parameters.offset_z}}",
+                "--input_file",
+                "{{inputs.parameters.input_file}}",
+                "--output_file",
+                "{{inputs.parameters.output_file}}",
+            ],
+            volumes=[volume],
+        )
+
+        mepp2_compress_obj = Container(
+            name="mepp2-compress-obj",
+            inputs=[
+                Parameter(name="input_file"),
+                Parameter(name="output_file"),
+            ],
+            image=environment.cluster.docker_registry
+            + "/"
+            + environment.cluster.docker_organisation
+            + "/"
+            + "mepp2:1.0",
+            image_pull_policy=models.ImagePullPolicy.always,
+            command=[
+                "/MEPP2/build/Examples/CGAL/Surface_mesh/progressive_compression_filter_cgal_surface_mesh",
+                "{{inputs.parameters.input_file}}",
+                "0",
+                "{{inputs.parameters.output_file}}",
+                '""',
+                "1 0 0 70 -1 0 12",
+            ],
+            volumes=[volume],
+        )
+
         with DAG(name="main"):
-            t1 = create_directory(
+            t_main_1 = create_directory(
                 name="create-directory-blender-generate",
                 arguments={
                     "directory_to_create": layout.blender_generate_stage_output_dir(),
@@ -276,10 +357,10 @@ if __name__ == "__main__":
             #     ]
             # )
             #
-            t2 = Task(name="blender-generate", template=blender_generate)
-            t1 >> t2
+            t_main_2 = Task(name="blender-generate", template=blender_generate)
+            t_main_1 >> t_main_2
 
-            t3 = create_directory(
+            t_main_3 = create_directory(
                 name="create-directory-fix-obj-normals",
                 arguments={
                     "directory_to_create": layout.fix_obj_normals_stage_output_dir(),
@@ -287,15 +368,15 @@ if __name__ == "__main__":
                     "mount_path": environment.persisted_volume.mount_path,
                 },
             )
-            t4 = fix_obj_normals(
+            t_main_4 = fix_obj_normals(
                 arguments={
                     "input_file": layout.blender_generate_stage_output_filename(),
                     "output_file": layout.fix_obj_normals_stage_output_filename(),
                 }
             )
-            t2 >> t3 >> t4
+            t_main_2 >> t_main_3 >> t_main_4
 
-            t5 = create_directory(
+            t_main_5 = create_directory(
                 name="create-directory-mepp2-convert-obj-to-off",
                 arguments={
                     "directory_to_create": layout.convert_obj_to_off_stage_output_dir(),
@@ -303,15 +384,15 @@ if __name__ == "__main__":
                     "mount_path": environment.persisted_volume.mount_path,
                 },
             )
-            t6 = mepp2_convert_obj_to_off(
+            t_main_6 = mepp2_convert_obj_to_off(
                 arguments={
                     "input_file": layout.fix_obj_normals_stage_output_filename(),
                     "output_file": layout.convert_obj_to_off_stage_output_filename(),
                 }
             )
-            t4 >> t5 >> t6
+            t_main_4 >> t_main_5 >> t_main_6
 
-            t7 = create_directory(
+            t_main_7 = create_directory(
                 name="create-directory-dgtal-from-off-to-hollow-vol",
                 arguments={
                     "directory_to_create": layout.from_off_to_hollow_vol_stage_output_dir(),
@@ -319,16 +400,16 @@ if __name__ == "__main__":
                     "mount_path": environment.persisted_volume.mount_path,
                 },
             )
-            t8 = dgtal_from_off_to_hollow_vol(
+            t_main_8 = dgtal_from_off_to_hollow_vol(
                 name="mesh2vol",
                 arguments={
                     "input_file": layout.convert_obj_to_off_stage_output_filename(),
                     "output_file": layout.from_off_to_hollow_vol_stage_output_filename(),
                 },
             )
-            t6 >> t7 >> t8
+            t_main_6 >> t_main_7 >> t_main_8
 
-            t9 = create_directory(
+            t_main_a_1 = create_directory(
                 name="create-directory-dgtal-from-hollow-to-filled-vol",
                 arguments={
                     "directory_to_create": layout.from_hollow_to_filled_vol_stage_output_dir(),
@@ -336,15 +417,15 @@ if __name__ == "__main__":
                     "mount_path": environment.persisted_volume.mount_path,
                 },
             )
-            t10 = dgtal_from_hollow_to_filled_vol(
+            t_main_a_2 = dgtal_from_hollow_to_filled_vol(
                 arguments={
                     "input_file": layout.from_off_to_hollow_vol_stage_output_filename(),
                     "output_file": layout.from_hollow_to_filled_vol_stage_output_filename(),
                 },
             )
-            t8 >> t9 >> t10
+            t_main_8 >> t_main_a_1 >> t_main_a_2
 
-            t11 = create_directory(
+            t_main_a_b_1 = create_directory(
                 name="create-directory-dgtal-from-vol-to-raw-obj",
                 arguments={
                     "directory_to_create": layout.from_vol_to_raw_obj_stage_output_dir(),
@@ -352,15 +433,15 @@ if __name__ == "__main__":
                     "mount_path": environment.persisted_volume.mount_path,
                 },
             )
-            t12 = dgtal_from_vol_to_raw_obj(
+            t_main_a_b_2 = dgtal_from_vol_to_raw_obj(
                 arguments={
                     "input_file": layout.from_hollow_to_filled_vol_stage_output_filename(),
                     "output_file": layout.from_vol_to_raw_obj_stage_output_filename(),
                 }
             )
-            t10 >> t11 >> t12
+            t_main_a_2 >> t_main_a_b_1 >> t_main_a_b_2
 
-            t13 = create_directory(
+            t_main_a_a_1 = create_directory(
                 name="create-directory-dgtal-from-vol-to-sdp",
                 arguments={
                     "directory_to_create": layout.from_vol_to_sdp_stage_output_dir(),
@@ -368,16 +449,33 @@ if __name__ == "__main__":
                     "mount_path": environment.persisted_volume.mount_path,
                 },
             )
-            t14 = dgtal_from_vol_to_sdp(
+            t_main_a_a_2 = dgtal_from_vol_to_sdp(
                 arguments={
                     "input_file": layout.from_hollow_to_filled_vol_stage_output_filename(),
-                    "output_file": layout.from_vol_to_raw_obj_stage_output_filename(),
+                    "output_file": layout.from_vol_to_sdp_stage_output_filename(),
                 }
             )
-            t10 >> t13 >> t14
+            t_main_a_2 >> t_main_a_a_1 >> t_main_a_a_2
 
-            # Rescaling the SDP
-            t9_b_1 = extract_mesh2vol_outputs(
+            t_main_a_a_3 = create_directory(
+                name="create-directory-from-sdp-to-obj",
+                arguments={
+                    "directory_to_create": layout.from_sdp_to_obj_stage_output_dir(),
+                    "claim_name": environment.persisted_volume.claim_name,
+                    "mount_path": environment.persisted_volume.mount_path,
+                },
+            )
+            t_main_a_a_4 = convert_sdp_to_obj(
+                arguments={
+                    "input_file": layout.from_vol_to_sdp_stage_output_filename(),
+                    "output_file": layout.from_sdp_to_obj_stage_output_filename(),
+                }
+            )
+
+            t_main_a_a_2 >> t_main_a_a_3 >> t_main_a_a_4
+
+            ### Rescaling the SDP
+            t_main_b_1 = extract_mesh2vol_outputs(
                 name="mesh2vol-log",
                 arguments={
                     "log_filename": layout.from_off_to_hollow_vol_stage_log_filename(),
@@ -385,8 +483,33 @@ if __name__ == "__main__":
                     "mount_path": environment.persisted_volume.mount_path,
                 },
             )
+            t_main_8 >> t_main_b_1
 
-            t9_b_2 = debug(arguments=t9_b_1.get_parameter("scale").with_name("message"))
-            t8 >> t9_b_1 >> t9_b_2
+            t_main_b_debug = debug(
+                arguments=t_main_b_1.get_parameter("scale").with_name("message")
+            )
+            t_main_b_1 >> t_main_b_debug
+
+            t_main_a_a_5 = create_directory(
+                name="create-directory-from-obj-to-rescaled-obj",
+                arguments={
+                    "directory_to_create": layout.from_obj_to_rescaled_obj_stage_output_dir(),
+                    "claim_name": environment.persisted_volume.claim_name,
+                    "mount_path": environment.persisted_volume.mount_path,
+                },
+            )
+            t_main_a_a_4 >> t_main_a_a_5
+            t_main_a_a_6 = obj_to_obj_scale_offset(
+                arguments={
+                    "scale": t_main_b_1.get_parameter("scale"),
+                    "offset_x": t_main_b_1.get_parameter("offset_x"),
+                    "offset_y": t_main_b_1.get_parameter("offset_y"),
+                    "offset_z": t_main_b_1.get_parameter("offset_z"),
+                    "input_file": layout.from_sdp_to_obj_stage_output_filename(),
+                    "output_file": layout.from_obj_to_rescaled_obj_stage_output_filename(),
+                }
+            )
+            t_main_a_a_5 >> t_main_a_a_6
+            t_main_b_1 >> t_main_a_a_6
 
     w.create()

@@ -21,6 +21,7 @@ if __name__ == "__main__":
     import sys
     import os
     import copy
+    from pathlib import Path
 
     # Parse command line arguments
     argParser = argparse.ArgumentParser(
@@ -53,8 +54,9 @@ if __name__ == "__main__":
         outputFilePath = args.output_file
     if os.path.isfile(outputFilePath):
         print(f"Output filename {outputFilePath} already exists.")
-        print("Exiting.")
-        sys.exit(1)
+        renamedFilePath = outputFilePath + ".renamed"
+        print(f"Renaming already existing file {outputFilePath} to {renamedFilePath}.")
+        os.rename(outputFilePath, renamedFilePath)
 
     # Read from input file and write to output file
     with open(args.input_file, "r") as inFile:

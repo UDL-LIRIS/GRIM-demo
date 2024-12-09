@@ -86,12 +86,44 @@ class layout:
         filename = stem_filename.replace("_filled", "_voxels") + ".obj"
         return os.path.join(self.from_vol_to_raw_obj_stage_output_dir(), filename)
 
-    ### VOL to SDP (extract median axis)
+    ### Extract median axis
+    # VOL to SDP
     def from_vol_to_sdp_stage_output_dir(self):
-        return self.stage_output_dir("stage_1_2_from_vol_to_SDP")
+        return self.stage_output_dir("stage_1_2_1_from_vol_to_SDP")
 
-    def from_vol_to_raw_obj_stage_output_filename(self):
+    def from_vol_to_sdp_stage_output_filename(self):
         input_filename = self.from_hollow_to_filled_vol_stage_output_filename()
         stem_filename = Path(input_filename).stem
-        filename = stem_filename + ".sdp"
+        filename = stem_filename + "_skeleton.sdp"
         return os.path.join(self.from_vol_to_sdp_stage_output_dir(), filename)
+
+    # SDP to OBJ
+    def from_sdp_to_obj_stage_output_dir(self):
+        return self.stage_output_dir("stage_1_2_2_from_SDP_to_OBJ")
+
+    def from_sdp_to_obj_stage_output_filename(self):
+        input_filename = self.from_vol_to_sdp_stage_output_filename()
+        stem_filename = Path(input_filename).stem
+        filename = stem_filename + ".obj"
+        return os.path.join(self.from_sdp_to_obj_stage_output_dir(), filename)
+
+    # OBJ to rescaled OBJ
+    def from_obj_to_rescaled_obj_stage_output_dir(self):
+        return self.stage_output_dir("stage_1_2_3_from_OBJ_to_rescaled_OBJ")
+
+    def from_obj_to_rescaled_obj_stage_output_filename(self):
+        input_filename = self.from_sdp_to_obj_stage_output_filename()
+        stem_filename = Path(input_filename).stem
+        filename = stem_filename + "_rescaled.obj"
+        return os.path.join(self.from_obj_to_rescaled_obj_stage_output_dir(), filename)
+
+    ### Triangulation compression (OBJ to BIN)
+    # SDP to OBJ
+    def from_obj_to_bin_stage_output_dir(self):
+        return self.stage_output_dir("stage_2_1_from_OBJ_to_BIN")
+
+    def from_obj_to_bin_stage_output_filename(self):
+        input_filename = self.from_vol_to_sdp_stage_output_filename()
+        stem_filename = Path(input_filename).stem
+        filename = stem_filename + ".obj"
+        return os.path.join(self.from_obj_to_bin_stage_output_dir(), filename)

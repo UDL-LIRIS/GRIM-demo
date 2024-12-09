@@ -11,13 +11,13 @@ from hera.workflows.models import ValueFrom
     outputs=[
         Parameter(name="scale", value_from=ValueFrom(path="/tmp/result_scale.txt")),
         Parameter(
-            name="x_offset", value_from=ValueFrom(path="/tmp/result_x_offset.txt")
+            name="offset_x", value_from=ValueFrom(path="/tmp/result_offset_x.txt")
         ),
         Parameter(
-            name="y_offset", value_from=ValueFrom(path="/tmp/result_y_offset.txt")
+            name="offset_y", value_from=ValueFrom(path="/tmp/result_offset_y.txt")
         ),
         Parameter(
-            name="z_offset", value_from=ValueFrom(path="/tmp/result_z_offset.txt")
+            name="offset_z", value_from=ValueFrom(path="/tmp/result_offset_z.txt")
         ),
     ],
     volumes=[
@@ -54,28 +54,28 @@ def extract_mesh2vol_outputs(
         print(f"Erroneous matching pattern. Found lines: {line_of_interest}")
         print("Exiting")
         sys.exit(1)
-    line_of_interest = line_of_interest[0]
 
-    print("aaaaaaa", log_lines)
-    print("bbbbbbbb", line_of_interest)
+    # Keeping digits, . (dot) and minus:
+    line_of_interest = line_of_interest[0]
     line_of_interest = line_of_interest.replace("Scale", "")
     line_of_interest = line_of_interest.replace("=", "")
     line_of_interest = line_of_interest.replace("translate", "")
     line_of_interest = line_of_interest.replace(",", "")
     line_of_interest = line_of_interest.replace("(", "").replace(")", "")
-    print("ccccccc", line_of_interest)
+
     numbers = line_of_interest.split()
     scale = numbers[0]
-    x_offset = numbers[1]
-    y_offset = numbers[2]
-    z_offset = numbers[3]
+    offset_x = numbers[1]
+    offset_y = numbers[2]
+    offset_z = numbers[3]
+
     with open("/tmp/result_scale.txt", "w") as f:
         f.write(scale)
-    with open("/tmp/result_x_offset.txt", "w") as f:
-        f.write(x_offset)
-    with open("/tmp/result_y_offset.txt", "w") as f:
-        f.write(y_offset)
-    with open("/tmp/result_z_offset.txt", "w") as f:
-        f.write(z_offset)
+    with open("/tmp/result_offset_x.txt", "w") as f:
+        f.write(offset_x)
+    with open("/tmp/result_offset_y.txt", "w") as f:
+        f.write(offset_y)
+    with open("/tmp/result_offset_z.txt", "w") as f:
+        f.write(offset_z)
 
     print("Done.")
