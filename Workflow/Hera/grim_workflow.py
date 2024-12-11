@@ -1,12 +1,4 @@
 if __name__ == "__main__":
-    import os
-    from parser import parser
-    from layout import layout
-    from environment import environment
-    from inputs import inputs
-    from script_create_directory import create_directory
-    from script_debug import debug
-    from script_extract_mesh2vol_outputs import extract_mesh2vol_outputs
 
     # A workflow that tests whether the defined environment is correct as
     # seen and used from within the Argo server engine (at Workflow runtime)
@@ -18,6 +10,18 @@ if __name__ == "__main__":
         Parameter,
         Task,
         Workflow,
+    )
+
+    import os
+    from parser import parser
+    from layout import layout
+    from environment import environment
+    from inputs import inputs
+    from script_create_directory import create_directory
+    from script_debug import debug
+    from script_extract_mesh2vol_outputs import extract_mesh2vol_outputs
+    from script_extract_list_of_evenly_distributed_batches import (
+        extract_list_of_evenly_distributed_batches,
     )
 
     args = parser().parse_args()
@@ -77,6 +81,34 @@ if __name__ == "__main__":
             ],
             volumes=[volume],
         )
+
+        mepp2_convert_obj_to_off_command = (
+            "/MEPP2/build/Testing/CGAL/Surface_mesh/test_generic_writer_surfacemesh "
+            + "{{inputs.parameters.input_file}} "
+            + "{{inputs.parameters.output_file}} "
+            # As its name indicates it, test_generic_writer_surfacemesh is
+            # a test that as such will take a third argument that designates
+            # a reference file to which the test compares its result. Although
+            # we here divert the usage of this test in order to use it as a
+            # simple filter, we still have to provide a reference file (to
+            # compare the result with). But we have no such file, and
+            # providing the result file as comparison file will also fail
+            # since the test expects the third argument to be the filename
+            # of file with ".coff" file format when the result has is in a
+            # ".cnoff" format. We thus provide a dummy filename for the test
+            # to accept to start and realize the first part of its job which
+            # is to compute some off output file.
+            + "dummy "
+            # But then the comparison (between the output off file and the
+            # un-existing dummy file) that the tests realizes will fail.
+            # This will in turn make the container to fail (return a fail
+            # exit code). In order to correct unwanted behavior, we use a
+            # wrapping shell to trap the exit code of the filter and convert
+            # it on the fly to become a success. That is we use
+            #     bash -c "<FILTER and ARGS> || true"
+            + "|| true"
+        )
+
         mepp2_convert_obj_to_off = Container(
             name="mepp2-convert-obj-to-off",
             inputs=[
@@ -89,30 +121,7 @@ if __name__ == "__main__":
             + "/"
             + "mepp2:1.0",
             image_pull_policy=models.ImagePullPolicy.always,
-            command=[
-                # As its name announces it, test_generic_writer_surfacemesh is
-                # a test that as such will take a third argument that designates
-                # a reference file to which the test compares its result. Although
-                # we here divert the usage of this test in order to use it as a
-                # simple filter, we still have to provide a reference file (to
-                # compare the result with). But we have no such file, and
-                # providing the result file as comparison file will also fail
-                # since the test expects the third argument to be the filename
-                # of file with ".coff" file format when the result has is in a
-                # ".cnoff" format. We thus provide a dummy filename for the test
-                # to accept to start and realize the first part of its job which
-                # is to compute some off output file.
-                # But then the comparison (between the output off file and the
-                # un-existing dummy file) that the tests realizes will fail.
-                # This will in turn make the container to fail (return a fail
-                # exit code). In order to correct unwanted behavior, we use a
-                # wrapping shell to trap the exit code of the filter and convert
-                # it on the fly to become a success. That is we use
-                #     bash -c "<FILTER and ARGS> || true"
-                "bash",
-                "-c",
-                "/MEPP2/build/Testing/CGAL/Surface_mesh/test_generic_writer_surfacemesh {{inputs.parameters.input_file}} {{inputs.parameters.output_file}} dummy || true",
-            ],
+            command=["bash", "-c", mepp2_convert_obj_to_off_command],
             volumes=[volume],
         )
 
@@ -315,7 +324,78 @@ if __name__ == "__main__":
                 "0",
                 "{{inputs.parameters.output_file}}",
                 '""',
+                # FIXME: only Vincent Vidal knows why the following parameters
+                # do work (as opposed to other values). Black magic (a.k.a.
+                # non reproducible thingies rule the numerical world :-( )
                 "1 0 0 70 -1 0 12",
+            ],
+            volumes=[volume],
+        )
+
+        mepp2_maximum_decompression_command = (
+            "/MEPP2/build/Examples/CGAL/Surface_mesh/progressive_decompression_filter_cgal_surface_mesh "
+            + "{{inputs.parameters.input_file}} "
+            + "maximum_decompressed_lod_dummy.obj "
+            + "2>&1 "
+            + "| tee "
+            + os.path.join(layout.from_bin_to_objs_stage_output_dir(), "decompress.log")
+            # But then the comparison (between the output off file and the
+            # un-existing dummy file) that the tests realizes will fail.
+            # Oddly enough the progressive_decompression_filter will exit with
+            # an error message of the form
+            #    terminate called after throwing an instance of 'std::runtime_error'
+            #       what():  Writer::write_obj_file -> output file failed to open.
+            # and a fail as exit code. In order to correct this unwanted behavior,
+            # (just as done with mepp2_convert_obj_to_off_command) we use a
+            # wrapping shell to trap the exit code of the filter and convert it
+            # on the fly to become a success. That is why we use
+            #     bash -c "<FILTER and ARGS> || true"
+            + "|| true"
+        )
+
+        mepp2_maximum_decompression_level = Container(
+            name="mepp2-maximum-decompression-level",
+            inputs=[
+                Parameter(name="input_file"),
+            ],
+            image=environment.cluster.docker_registry
+            + "/"
+            + environment.cluster.docker_organisation
+            + "/"
+            + "mepp2:1.0",
+            image_pull_policy=models.ImagePullPolicy.always,
+            command=[
+                "bash",
+                "-c",
+                mepp2_maximum_decompression_command,
+            ],
+            volumes=[volume],
+        )
+
+        mepp2_single_level_decompression_command = (
+            "set -x; /MEPP2/build/Examples/CGAL/Surface_mesh/progressive_decompression_filter_cgal_surface_mesh "
+            + "{{inputs.parameters.input_file}} "
+            + "{{inputs.parameters.output_basename}}{{inputs.parameters.batch_id}}.obj "
+            + "{{inputs.parameters.batch_id}}"
+        )
+
+        mepp2_single_level_decompression_level = Container(
+            name="mepp2-single-level-decompression",
+            inputs=[
+                Parameter(name="input_file"),
+                Parameter(name="output_basename"),
+                Parameter(name="batch_id"),
+            ],
+            image=environment.cluster.docker_registry
+            + "/"
+            + environment.cluster.docker_organisation
+            + "/"
+            + "mepp2:1.0",
+            image_pull_policy=models.ImagePullPolicy.always,
+            command=[
+                "bash",
+                "-c",
+                mepp2_single_level_decompression_command,
             ],
             volumes=[volume],
         )
@@ -329,6 +409,7 @@ if __name__ == "__main__":
                     "mount_path": environment.persisted_volume.mount_path,
                 },
             )
+
             # For the time being bpy (Python blender) won't work on
             # AppleSilicon (either in native M3 nor in amd64 emulated with
             # Rosetta. Blame it on Apple for their failed move away from Intel.)
@@ -376,7 +457,7 @@ if __name__ == "__main__":
             )
             t_main_2 >> t_main_3 >> t_main_4
 
-            t_main_5 = create_directory(
+            t_main_a_1 = create_directory(
                 name="create-directory-mepp2-convert-obj-to-off",
                 arguments={
                     "directory_to_create": layout.convert_obj_to_off_stage_output_dir(),
@@ -384,15 +465,15 @@ if __name__ == "__main__":
                     "mount_path": environment.persisted_volume.mount_path,
                 },
             )
-            t_main_6 = mepp2_convert_obj_to_off(
+            t_main_a_2 = mepp2_convert_obj_to_off(
                 arguments={
                     "input_file": layout.fix_obj_normals_stage_output_filename(),
                     "output_file": layout.convert_obj_to_off_stage_output_filename(),
                 }
             )
-            t_main_4 >> t_main_5 >> t_main_6
+            t_main_4 >> t_main_a_1 >> t_main_a_2
 
-            t_main_7 = create_directory(
+            t_main_a_3 = create_directory(
                 name="create-directory-dgtal-from-off-to-hollow-vol",
                 arguments={
                     "directory_to_create": layout.from_off_to_hollow_vol_stage_output_dir(),
@@ -400,16 +481,16 @@ if __name__ == "__main__":
                     "mount_path": environment.persisted_volume.mount_path,
                 },
             )
-            t_main_8 = dgtal_from_off_to_hollow_vol(
+            t_main_a_4 = dgtal_from_off_to_hollow_vol(
                 name="mesh2vol",
                 arguments={
                     "input_file": layout.convert_obj_to_off_stage_output_filename(),
                     "output_file": layout.from_off_to_hollow_vol_stage_output_filename(),
                 },
             )
-            t_main_6 >> t_main_7 >> t_main_8
+            t_main_a_2 >> t_main_a_3 >> t_main_a_4
 
-            t_main_a_1 = create_directory(
+            t_main_a_a_1 = create_directory(
                 name="create-directory-dgtal-from-hollow-to-filled-vol",
                 arguments={
                     "directory_to_create": layout.from_hollow_to_filled_vol_stage_output_dir(),
@@ -417,15 +498,15 @@ if __name__ == "__main__":
                     "mount_path": environment.persisted_volume.mount_path,
                 },
             )
-            t_main_a_2 = dgtal_from_hollow_to_filled_vol(
+            t_main_a_a_2 = dgtal_from_hollow_to_filled_vol(
                 arguments={
                     "input_file": layout.from_off_to_hollow_vol_stage_output_filename(),
                     "output_file": layout.from_hollow_to_filled_vol_stage_output_filename(),
                 },
             )
-            t_main_8 >> t_main_a_1 >> t_main_a_2
+            t_main_a_4 >> t_main_a_a_1 >> t_main_a_a_2
 
-            t_main_a_b_1 = create_directory(
+            t_main_a_a_b_1 = create_directory(
                 name="create-directory-dgtal-from-vol-to-raw-obj",
                 arguments={
                     "directory_to_create": layout.from_vol_to_raw_obj_stage_output_dir(),
@@ -433,15 +514,15 @@ if __name__ == "__main__":
                     "mount_path": environment.persisted_volume.mount_path,
                 },
             )
-            t_main_a_b_2 = dgtal_from_vol_to_raw_obj(
+            t_main_a_a_b_2 = dgtal_from_vol_to_raw_obj(
                 arguments={
                     "input_file": layout.from_hollow_to_filled_vol_stage_output_filename(),
                     "output_file": layout.from_vol_to_raw_obj_stage_output_filename(),
                 }
             )
-            t_main_a_2 >> t_main_a_b_1 >> t_main_a_b_2
+            t_main_a_a_2 >> t_main_a_a_b_1 >> t_main_a_a_b_2
 
-            t_main_a_a_1 = create_directory(
+            t_main_a_a_a_1 = create_directory(
                 name="create-directory-dgtal-from-vol-to-sdp",
                 arguments={
                     "directory_to_create": layout.from_vol_to_sdp_stage_output_dir(),
@@ -449,15 +530,15 @@ if __name__ == "__main__":
                     "mount_path": environment.persisted_volume.mount_path,
                 },
             )
-            t_main_a_a_2 = dgtal_from_vol_to_sdp(
+            t_main_a_a_a_2 = dgtal_from_vol_to_sdp(
                 arguments={
                     "input_file": layout.from_hollow_to_filled_vol_stage_output_filename(),
                     "output_file": layout.from_vol_to_sdp_stage_output_filename(),
                 }
             )
-            t_main_a_2 >> t_main_a_a_1 >> t_main_a_a_2
+            t_main_a_a_2 >> t_main_a_a_a_1 >> t_main_a_a_a_2
 
-            t_main_a_a_3 = create_directory(
+            t_main_a_a_a_3 = create_directory(
                 name="create-directory-from-sdp-to-obj",
                 arguments={
                     "directory_to_create": layout.from_sdp_to_obj_stage_output_dir(),
@@ -465,17 +546,17 @@ if __name__ == "__main__":
                     "mount_path": environment.persisted_volume.mount_path,
                 },
             )
-            t_main_a_a_4 = convert_sdp_to_obj(
+            t_main_a_a_a_4 = convert_sdp_to_obj(
                 arguments={
                     "input_file": layout.from_vol_to_sdp_stage_output_filename(),
                     "output_file": layout.from_sdp_to_obj_stage_output_filename(),
                 }
             )
 
-            t_main_a_a_2 >> t_main_a_a_3 >> t_main_a_a_4
+            t_main_a_a_a_2 >> t_main_a_a_a_3 >> t_main_a_a_a_4
 
             ### Rescaling the SDP
-            t_main_b_1 = extract_mesh2vol_outputs(
+            t_main_a_b_1 = extract_mesh2vol_outputs(
                 name="mesh2vol-log",
                 arguments={
                     "log_filename": layout.from_off_to_hollow_vol_stage_log_filename(),
@@ -483,14 +564,14 @@ if __name__ == "__main__":
                     "mount_path": environment.persisted_volume.mount_path,
                 },
             )
-            t_main_8 >> t_main_b_1
+            t_main_a_4 >> t_main_a_b_1
 
-            t_main_b_debug = debug(
-                arguments=t_main_b_1.get_parameter("scale").with_name("message")
+            t_main_a_b_debug = debug(
+                arguments=t_main_a_b_1.get_parameter("scale").with_name("message")
             )
-            t_main_b_1 >> t_main_b_debug
+            t_main_a_b_1 >> t_main_a_b_debug
 
-            t_main_a_a_5 = create_directory(
+            t_main_a_a_a_5 = create_directory(
                 name="create-directory-from-obj-to-rescaled-obj",
                 arguments={
                     "directory_to_create": layout.from_obj_to_rescaled_obj_stage_output_dir(),
@@ -498,18 +579,84 @@ if __name__ == "__main__":
                     "mount_path": environment.persisted_volume.mount_path,
                 },
             )
-            t_main_a_a_4 >> t_main_a_a_5
-            t_main_a_a_6 = obj_to_obj_scale_offset(
+            t_main_a_a_a_4 >> t_main_a_a_a_5
+            t_main_a_a_a_6 = obj_to_obj_scale_offset(
                 arguments={
-                    "scale": t_main_b_1.get_parameter("scale"),
-                    "offset_x": t_main_b_1.get_parameter("offset_x"),
-                    "offset_y": t_main_b_1.get_parameter("offset_y"),
-                    "offset_z": t_main_b_1.get_parameter("offset_z"),
+                    "scale": t_main_a_b_1.get_parameter("scale"),
+                    "offset_x": t_main_a_b_1.get_parameter("offset_x"),
+                    "offset_y": t_main_a_b_1.get_parameter("offset_y"),
+                    "offset_z": t_main_a_b_1.get_parameter("offset_z"),
                     "input_file": layout.from_sdp_to_obj_stage_output_filename(),
                     "output_file": layout.from_obj_to_rescaled_obj_stage_output_filename(),
                 }
             )
-            t_main_a_a_5 >> t_main_a_a_6
-            t_main_b_1 >> t_main_a_a_6
+            t_main_a_a_a_5 >> t_main_a_a_a_6
+            t_main_a_b_1 >> t_main_a_a_a_6
+
+            ####################### Compression of triangulation
+            t_main_b_1 = create_directory(
+                name="create-directory-from-obj-to-bin",
+                arguments={
+                    "directory_to_create": layout.from_obj_to_bin_stage_output_dir(),
+                    "claim_name": environment.persisted_volume.claim_name,
+                    "mount_path": environment.persisted_volume.mount_path,
+                },
+            )
+            t_main_4 >> t_main_b_1
+            t_main_b_2 = mepp2_compress_obj(
+                arguments={
+                    "input_file": layout.fix_obj_normals_stage_output_filename(),
+                    "output_file": layout.from_obj_to_bin_stage_output_filename(),
+                }
+            )
+            t_main_b_1 >> t_main_b_2
+
+            ####################### Retrieve a fixed number of ad-hoc compressed
+            # triangulations (out of the possible range)
+            # Start with discovering the highest decompression level
+            t_main_b_3 = create_directory(
+                name="create-directory-decompression-level",
+                arguments={
+                    "directory_to_create": layout.from_bin_to_objs_stage_output_dir(),
+                    "claim_name": environment.persisted_volume.claim_name,
+                    "mount_path": environment.persisted_volume.mount_path,
+                },
+            )
+            t_main_b_2 >> t_main_b_3
+            t_main_b_4 = mepp2_maximum_decompression_level(
+                arguments={
+                    "input_file": layout.from_obj_to_bin_stage_output_filename(),
+                }
+            )
+            t_main_b_3 >> t_main_b_4
+
+            # Then produce a restricted list of evenly distributed (among the
+            # possible decompression levels) triangulations:
+            t_main_b_5 = extract_list_of_evenly_distributed_batches(
+                arguments={
+                    "log_filename": os.path.join(
+                        layout.from_bin_to_objs_stage_output_dir(), "decompress.log"
+                    ),
+                    "desired_number_of_batches": 4,
+                    "claim_name": environment.persisted_volume.claim_name,
+                    "mount_path": environment.persisted_volume.mount_path,
+                }
+            )
+            t_main_b_4 >> t_main_b_5
+
+            t_main_b_6 = mepp2_single_level_decompression_level(
+                name="decompress-loop",
+                arguments={
+                    "input_file": layout.from_obj_to_bin_stage_output_filename(),
+                    "output_basename": layout.from_bin_to_objs_stage_output_single_level_basename(),
+                    "batch_id": "{{item}}",
+                },
+                # with_items=[1, 6, 18],
+                # FAIL with_items=[t_main_b_5.get_parameter("list_of_batches")],
+                # with_param=t_main_b_5.get_parameter("list_of_batches"),
+                with_param=t_main_b_5.result,
+                # with_items=["foo", "bar", "baz"]
+            )
+            t_main_b_5 >> t_main_b_6
 
     w.create()

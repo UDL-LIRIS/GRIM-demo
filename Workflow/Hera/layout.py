@@ -118,12 +118,21 @@ class layout:
         return os.path.join(self.from_obj_to_rescaled_obj_stage_output_dir(), filename)
 
     ### Triangulation compression (OBJ to BIN)
-    # SDP to OBJ
+    # OBJ to BIN
     def from_obj_to_bin_stage_output_dir(self):
         return self.stage_output_dir("stage_2_1_from_OBJ_to_BIN")
 
     def from_obj_to_bin_stage_output_filename(self):
-        input_filename = self.from_vol_to_sdp_stage_output_filename()
+        input_filename = self.fix_obj_normals_stage_output_filename()
         stem_filename = Path(input_filename).stem
-        filename = stem_filename + ".obj"
+        filename = stem_filename + ".bin"
         return os.path.join(self.from_obj_to_bin_stage_output_dir(), filename)
+
+    # Decompression extracts many OBJ files (thus the plural for OBJs)
+    def from_bin_to_objs_stage_output_dir(self):
+        return self.stage_output_dir("stage_2_2_from_BIN_to_OBJs")
+
+    def from_bin_to_objs_stage_output_single_level_basename(self):
+        filename = self.from_obj_to_bin_stage_output_filename()
+        stem_filename = Path(filename).stem
+        return os.path.join(self.from_bin_to_objs_stage_output_dir(), stem_filename)
