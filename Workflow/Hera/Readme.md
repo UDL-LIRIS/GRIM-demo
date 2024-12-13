@@ -33,12 +33,21 @@ python test_environment.py             # Test AW server with handshake
 
 FIXME: clean up or document the `docker compose build` option that can be useful for building in a minikube context.
 
+**WARNING**: some containers (py3dtilers, that uses IFC support, or ribs for which blender depends on the `bpy` x86_64 binary package) of this workflow have binary dependences. Hence such containers can only be (docker_ build on an x86_64 (processor) architecture and cross building will also fail. Before building you should thus **assert your architecture with the command**
+
+```bash
+docker system info --format '{{.Architecture}}'
+```
+
+whose **result must be `x86_64`**.
+
+
 ```bash
 export REGISTRY=harbor.pagoda.os.univ-lyon1.fr
 export REGISTRY_GROUP=vcity
 export ORGANISATION=${REGISTRY_GROUP}/grim
 # Adapt to your platform (cross building not always needed)
-alias docker_build="docker buildx build --platform=linux/amd64"
+alias docker_build="docker build"
 # Login to the platform docker registry
 docker login ${REGISTRY}/${REGISTRY_GROUP} --username <my-username>
 ```
@@ -48,13 +57,12 @@ docker login ${REGISTRY}/${REGISTRY_GROUP} --username <my-username>
 docker_build -t ${ORGANISATION}/ribs:1.0                       https://github.com/VCityTeam/TT-Ribs.git -f Docker/Dockerfile
 docker_build -t ${ORGANISATION}/fixobjnormals:1.0              `git rev-parse --show-toplevel`/Docker/FixObjNormalsContext
 docker_build -t ${ORGANISATION}/py3dtiles:v7.0.0               https://gitlab.com/py3dtiles/py3dtiles.git#v7.0.0 -f docker/Dockerfile
-docker_build -t ${ORGANISATION}/py3dtilers:1.0                 `git rev-parse --show-toplevel`/Docker/Py3dtilerContext
+docker_build -t ${ORGANISATION}/py3dtilers:1.0                 `git rev-parse --show-toplevel`/Docker/Py3dtilersContext
 docker_build -t ${ORGANISATION}/offsetthreedtilesettolyon:1.0  https://github.com/VCityTeam/UD-Reproducibility.git#master:Computations/3DTiles/Ribs/OffsetTilesetContext
 docker_build -t ${ORGANISATION}/mepp2:1.0                      `git rev-parse --show-toplevel`/Docker/Mepp2Context
 docker_build -t ${ORGANISATION}/dgtal:1.0                      `git rev-parse --show-toplevel`/Docker/DgtalContext
 docker_build -t ${ORGANISATION}/convertsdptoobj:1.0            `git rev-parse --show-toplevel`/Docker/ConvertSdpToObjContext
 docker_build -t ${ORGANISATION}/objtoobjscaleoffset:1.0        `git rev-parse --show-toplevel`/Docker/ObjToObjScaleOffsetContext
-docker_build -t ${ORGANISATION}/py3dtilers:1.0                 https://github.com/VCityTeam/py3dtilers-docker.git -f Context/Dockerfile
 ```
 
 ```bash
@@ -68,7 +76,6 @@ docker tag ${ORGANISATION}/mepp2:1.0                      ${REGISTRY}/${ORGANISA
 docker tag ${ORGANISATION}/dgtal:1.0                      ${REGISTRY}/${ORGANISATION}/dgtal:1.0
 docker tag ${ORGANISATION}/convertsdptoobj:1.0            ${REGISTRY}/${ORGANISATION}/convertsdptoobj:1.0
 docker tag ${ORGANISATION}/objtoobjscaleoffset:1.0        ${REGISTRY}/${ORGANISATION}/objtoobjscaleoffset:1.0
-docker tag ${ORGANISATION}/py3dtilers:1.0                 ${REGISTRY}/${ORGANISATION}/py3dtilers:1.0
 ```
 
 ```bash
@@ -82,7 +89,6 @@ docker push ${REGISTRY}/${ORGANISATION}/mepp2:1.0
 docker push ${REGISTRY}/${ORGANISATION}/dgtal:1.0
 docker push ${REGISTRY}/${ORGANISATION}/convertsdptoobj:1.0
 docker push ${REGISTRY}/${ORGANISATION}/objtoobjscaleoffset:1.0
-docker push ${REGISTRY}/${ORGANISATION}/py3dtilers:1.0
 ```
 
 ## Allocating cluster level Workflow ressources
