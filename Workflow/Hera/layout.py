@@ -136,3 +136,8 @@ class layout:
         filename = self.from_obj_to_bin_stage_output_filename()
         stem_filename = Path(filename).stem
         return os.path.join(self.from_bin_to_objs_stage_output_dir(), stem_filename)
+
+    #### The resulting directory regroups the skeleton, the generated tileset
+    # as well as the geographic offset
+    def workflow_resulting_dir(self):
+        return self.stage_output_dir("stage_3_data_final")

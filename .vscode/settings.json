@@ -5,6 +5,8 @@
         "dgtal",
         "mepp",
         "MEPP",
-        "robustify"
+        "robustify",
+        "threedtiles",
+        "tileset"
     ]
 }

@@ -3,11 +3,7 @@ if __name__ == "__main__":
     # A workflow that tests whether the defined environment is correct as
     # seen and used from within the Argo server engine (at Workflow runtime)
     from hera.workflows import (
-        Container,
         DAG,
-        ExistingVolume,
-        models,
-        Parameter,
         Task,
         Workflow,
     )
@@ -17,6 +13,37 @@ if __name__ == "__main__":
     from layout import layout
     from environment import environment
     from inputs import inputs
+
+    ### Containers definitions
+    from container_blender_generate import define_blender_generate_container
+    from container_fix_obj_normals import define_fix_obj_normals_container
+    from container_mepp2_convert_obj_to_off import define_mepp2_convert_obj_to_off
+    from container_dgtal_from_off_to_hollow_vol import (
+        define__dgtal_from_off_to_hollow_vol_container,
+    )
+    from container_dgtal_from_hollow_to_filled_vol import (
+        define_dgtal_from_hollow_to_filled_vol_container,
+    )
+    from container_dgtal_from_vol_to_raw_obj import (
+        define_dgtal_from_vol_to_raw_obj_container,
+    )
+    from container_dgtal_from_vol_to_sdp import define_dgtal_from_vol_to_sdp_container
+    from container_convert_sdp_to_obj import define_convert_sdp_to_obj_container
+    from container_obj_to_obj_scale_offset import (
+        define_obj_to_obj_scale_offset_container,
+    )
+    from container_mepp2_compress_obj import define_mepp2_compress_obj_container
+    from container_mepp2_maximum_decompression_level import (
+        define_mepp2_maximum_decompression_container,
+    )
+    from container_mepp2_single_level_decompression import (
+        define_mepp2_single_level_decompression_container,
+    )
+    from container_py3dtilers_objs_to_3dtiles import (
+        define_py3dtilers_objs_to_3dtiles_container,
+    )
+
+    ### Scripts definitions
     from script_create_directory import create_directory
     from script_debug import debug
     from script_extract_mesh2vol_outputs import extract_mesh2vol_outputs
@@ -28,379 +55,51 @@ if __name__ == "__main__":
     environment = environment(args)
     layout = layout(inputs, environment)
 
-    ### From now on, the only variables that must be used should be
-    # derived/based-on the environment and layout variables
-    ## Helpers and synthetic sugar
-    volume = ExistingVolume(
-        claim_name=environment.persisted_volume.claim_name,
-        name="dummy",
-        mount_path=environment.persisted_volume.mount_path,
-    )
+    ### From now on, the only variables that must be used should be derived
+    # (or based-on) the environment, layout and inputs variables
 
     with Workflow(generate_name="grim-workflow-", entrypoint="main") as w:
 
-        # Reference: https://github.com/VCityTeam/UD-Reproducibility/blob/master/Computations/3DTiles/Ribs/Readme.md#for-the-cave-system
-        blender_generate = Container(
-            name="blender-generate",
-            image=environment.cluster.docker_registry
-            + "/"
-            + environment.cluster.docker_organisation
-            + "/"
-            + "ribs:1.0",
-            image_pull_policy=models.ImagePullPolicy.always,
-            command=[
-                "python",
-                "Cave.py",
-                "-v",
-                "--subdivision",
-                "1",
-                "--fill_holes",
-                "True",
-                "--outputdir",
-                layout.blender_generate_stage_output_dir(),
-            ],
-            volumes=[volume],
+        #### Container definitions (must be within Workflow context)
+        blender_generate_c = define_blender_generate_container(environment, layout)
+        fix_obj_normals_c = define_fix_obj_normals_container(environment)
+        mepp2_convert_obj_to_off_c = define_mepp2_convert_obj_to_off(environment)
+        dgtal_from_off_to_hollow_vol_c = define__dgtal_from_off_to_hollow_vol_container(
+            environment, layout, inputs
         )
-        fix_obj_normals = Container(
-            name="fix-obj-normals",
-            inputs=[
-                Parameter(name="input_file"),
-                Parameter(name="output_file"),
-            ],
-            image=environment.cluster.docker_registry
-            + "/"
-            + environment.cluster.docker_organisation
-            + "/"
-            + "fixobjnormals:1.0",
-            image_pull_policy=models.ImagePullPolicy.always,
-            command=[
-                "python3",
-                "fix_OBJ_normals_for_MEPP2.py",
-                "{{inputs.parameters.input_file}}",
-                "{{inputs.parameters.output_file}}",
-            ],
-            volumes=[volume],
+        dgtal_from_hollow_to_filled_vol_c = (
+            define_dgtal_from_hollow_to_filled_vol_container(environment)
+        )
+        dgtal_from_vol_to_raw_obj_c = define_dgtal_from_vol_to_raw_obj_container(
+            environment
+        )
+        dgtal_from_vol_to_sdp_c = define_dgtal_from_vol_to_sdp_container(environment)
+        convert_sdp_to_obj_c = define_convert_sdp_to_obj_container(environment)
+        obj_to_obj_scale_offset_c = define_obj_to_obj_scale_offset_container(
+            environment
+        )
+        mepp2_compress_obj_c = define_mepp2_compress_obj_container(environment)
+        mepp2_maximum_decompression_c = define_mepp2_maximum_decompression_container(
+            environment, layout
+        )
+        mepp2_single_level_decompression_c = (
+            define_mepp2_single_level_decompression_container(environment)
+        )
+        py3dtilers_objs_to_3dtiles_c = define_py3dtilers_objs_to_3dtiles_container(
+            environment, inputs
         )
 
-        mepp2_convert_obj_to_off_command = (
-            "/MEPP2/build/Testing/CGAL/Surface_mesh/test_generic_writer_surfacemesh "
-            + "{{inputs.parameters.input_file}} "
-            + "{{inputs.parameters.output_file}} "
-            # As its name indicates it, test_generic_writer_surfacemesh is
-            # a test that as such will take a third argument that designates
-            # a reference file to which the test compares its result. Although
-            # we here divert the usage of this test in order to use it as a
-            # simple filter, we still have to provide a reference file (to
-            # compare the result with). But we have no such file, and
-            # providing the result file as comparison file will also fail
-            # since the test expects the third argument to be the filename
-            # of file with ".coff" file format when the result has is in a
-            # ".cnoff" format. We thus provide a dummy filename for the test
-            # to accept to start and realize the first part of its job which
-            # is to compute some off output file.
-            + "dummy "
-            # But then the comparison (between the output off file and the
-            # un-existing dummy file) that the tests realizes will fail.
-            # This will in turn make the container to fail (return a fail
-            # exit code). In order to correct unwanted behavior, we use a
-            # wrapping shell to trap the exit code of the filter and convert
-            # it on the fly to become a success. That is we use
-            #     bash -c "<FILTER and ARGS> || true"
-            + "|| true"
-        )
-
-        mepp2_convert_obj_to_off = Container(
-            name="mepp2-convert-obj-to-off",
-            inputs=[
-                Parameter(name="input_file"),
-                Parameter(name="output_file"),
-            ],
-            image=environment.cluster.docker_registry
-            + "/"
-            + environment.cluster.docker_organisation
-            + "/"
-            + "mepp2:1.0",
-            image_pull_policy=models.ImagePullPolicy.always,
-            command=["bash", "-c", mepp2_convert_obj_to_off_command],
-            volumes=[volume],
-        )
-
-        mes2vol_command = (
-            "/home/digital/git/DGtalTools/build/converters/mesh2vol "
-            + "-i {{inputs.parameters.input_file}} "
-            + "-o {{inputs.parameters.output_file}} "
-            + "-r "
-            + str(inputs.parameters.mesh2vol_resolution)
-            # Black magic (following) line:
-            # - mesh2vol log outputs are routed to stderr,
-            # - yet running the same command, but without the stderr redirection
-            #   to stdout, with docker -t will still produce a mesh2vol.log with
-            #   some content (because the -t option regroups stderr with stdout),
-            # - but running that command (still without the stderr redirection
-            #   to stdout) over Kubernetes will produce an empty mesh2vol.log
-            #   file.
-            # - yet if one adds the stderr redirection to stdout, then even over
-            #   Kubernetes the mesh2vol.log file will the proper content.
-            + " 2>&1 "
-            # The workflow needs to extract some parameters (required as input
-            # to some downstream Tasks) from the logs. We thus tee in order
-            # to have both the AW logs and an output file that the workflow
-            # can use
-            + "| tee "
-            + os.path.join(
-                layout.from_off_to_hollow_vol_stage_output_dir(), "mesh2vol.log"
-            )
-        )
-
-        dgtal_from_off_to_hollow_vol = Container(
-            name="dgtal-from-off-to-hollow-vol",
-            inputs=[
-                Parameter(name="input_file"),
-                Parameter(name="output_file"),
-            ],
-            image=environment.cluster.docker_registry
-            + "/"
-            + environment.cluster.docker_organisation
-            + "/"
-            + "dgtal:1.0",
-            image_pull_policy=models.ImagePullPolicy.always,
-            command=[
-                # We need to redirect the standard output of the mesh2vol filter
-                # to a file in order to extract the scaling factor and the offset.
-                # For this we use the shell pipe mechanism together with a tee
-                # trick
-                "bash",
-                "-c",
-                mes2vol_command,
-            ],
-            volumes=[volume],
-        )
-
-        dgtal_from_hollow_to_filled_vol = Container(
-            name="dgtal-from-hollow-to-filled-vol",
-            inputs=[
-                Parameter(name="input_file"),
-                Parameter(name="output_file"),
-            ],
-            image=environment.cluster.docker_registry
-            + "/"
-            + environment.cluster.docker_organisation
-            + "/"
-            + "dgtal:1.0",
-            image_pull_policy=models.ImagePullPolicy.always,
-            command=[
-                "/home/digital/git/DGtalTools/build/volumetric/volFillInterior",
-                "-i",
-                "{{inputs.parameters.input_file}}",
-                "-o",
-                "{{inputs.parameters.output_file}}",
-            ],
-            volumes=[volume],
-        )
-
-        dgtal_from_vol_to_raw_obj = Container(
-            name="dgtal-from-vol-to-raw-obj",
-            inputs=[
-                Parameter(name="input_file"),
-                Parameter(name="output_file"),
-            ],
-            image=environment.cluster.docker_registry
-            + "/"
-            + environment.cluster.docker_organisation
-            + "/"
-            + "dgtal:1.0",
-            image_pull_policy=models.ImagePullPolicy.always,
-            command=[
-                "/home/digital/git/DGtalTools/build/converters/vol2obj",
-                "-i",
-                "{{inputs.parameters.input_file}}",
-                "-o",
-                "{{inputs.parameters.output_file}}",
-            ],
-            volumes=[volume],
-        )
-
-        dgtal_from_vol_to_sdp = Container(
-            name="dgtal-from-vol-to-sdp",
-            inputs=[
-                Parameter(name="input_file"),
-                Parameter(name="output_file"),
-            ],
-            image=environment.cluster.docker_registry
-            + "/"
-            + environment.cluster.docker_organisation
-            + "/"
-            + "dgtal:1.0",
-            image_pull_policy=models.ImagePullPolicy.always,
-            command=[
-                "criticalKernelsThinning3D",
-                "--input",
-                "{{inputs.parameters.input_file}}",
-                "--select",
-                "dmax",
-                "--skel",
-                "1isthmus",
-                "--persistence",
-                "1",
-                "-e",
-                "{{inputs.parameters.output_file}}",
-            ],
-            volumes=[volume],
-        )
-
-        convert_sdp_to_obj = Container(
-            name="convert-sdp-to-obj",
-            inputs=[
-                Parameter(name="input_file"),
-                Parameter(name="output_file"),
-            ],
-            image=environment.cluster.docker_registry
-            + "/"
-            + environment.cluster.docker_organisation
-            + "/"
-            + "convertsdptoobj:1.0",
-            image_pull_policy=models.ImagePullPolicy.always,
-            command=[
-                "python3",
-                "convert_sdp_to_obj.py",
-                "--input_file",
-                "{{inputs.parameters.input_file}}",
-                "--output_file",
-                "{{inputs.parameters.output_file}}",
-            ],
-            volumes=[volume],
-        )
-
-        obj_to_obj_scale_offset = Container(
-            name="obj-to-obj-scale-offset",
-            inputs=[
-                Parameter(name="scale"),
-                Parameter(name="offset_x"),
-                Parameter(name="offset_y"),
-                Parameter(name="offset_z"),
-                Parameter(name="input_file"),
-                Parameter(name="output_file"),
-            ],
-            image=environment.cluster.docker_registry
-            + "/"
-            + environment.cluster.docker_organisation
-            + "/"
-            + "objtoobjscaleoffset:1.0",
-            image_pull_policy=models.ImagePullPolicy.always,
-            command=[
-                "python3",
-                "obj_to_obj_scale_offset.py",
-                "--scale",
-                "{{inputs.parameters.scale}}",
-                "--offset_x",
-                "{{inputs.parameters.offset_x}}",
-                "--offset_y",
-                "{{inputs.parameters.offset_y}}",
-                "--offset_z",
-                "{{inputs.parameters.offset_z}}",
-                "--input_file",
-                "{{inputs.parameters.input_file}}",
-                "--output_file",
-                "{{inputs.parameters.output_file}}",
-            ],
-            volumes=[volume],
-        )
-
-        mepp2_compress_obj = Container(
-            name="mepp2-compress-obj",
-            inputs=[
-                Parameter(name="input_file"),
-                Parameter(name="output_file"),
-            ],
-            image=environment.cluster.docker_registry
-            + "/"
-            + environment.cluster.docker_organisation
-            + "/"
-            + "mepp2:1.0",
-            image_pull_policy=models.ImagePullPolicy.always,
-            command=[
-                "/MEPP2/build/Examples/CGAL/Surface_mesh/progressive_compression_filter_cgal_surface_mesh",
-                "{{inputs.parameters.input_file}}",
-                "0",
-                "{{inputs.parameters.output_file}}",
-                '""',
-                # FIXME: only Vincent Vidal knows why the following parameters
-                # do work (as opposed to other values). Black magic (a.k.a.
-                # non reproducible thingies rule the numerical world :-( )
-                "1 0 0 70 -1 0 12",
-            ],
-            volumes=[volume],
-        )
-
-        mepp2_maximum_decompression_command = (
-            "/MEPP2/build/Examples/CGAL/Surface_mesh/progressive_decompression_filter_cgal_surface_mesh "
-            + "{{inputs.parameters.input_file}} "
-            + "maximum_decompressed_lod_dummy.obj "
-            + "2>&1 "
-            + "| tee "
-            + os.path.join(layout.from_bin_to_objs_stage_output_dir(), "decompress.log")
-            # But then the comparison (between the output off file and the
-            # un-existing dummy file) that the tests realizes will fail.
-            # Oddly enough the progressive_decompression_filter will exit with
-            # an error message of the form
-            #    terminate called after throwing an instance of 'std::runtime_error'
-            #       what():  Writer::write_obj_file -> output file failed to open.
-            # and a fail as exit code. In order to correct this unwanted behavior,
-            # (just as done with mepp2_convert_obj_to_off_command) we use a
-            # wrapping shell to trap the exit code of the filter and convert it
-            # on the fly to become a success. That is why we use
-            #     bash -c "<FILTER and ARGS> || true"
-            + "|| true"
-        )
-
-        mepp2_maximum_decompression_level = Container(
-            name="mepp2-maximum-decompression-level",
-            inputs=[
-                Parameter(name="input_file"),
-            ],
-            image=environment.cluster.docker_registry
-            + "/"
-            + environment.cluster.docker_organisation
-            + "/"
-            + "mepp2:1.0",
-            image_pull_policy=models.ImagePullPolicy.always,
-            command=[
-                "bash",
-                "-c",
-                mepp2_maximum_decompression_command,
-            ],
-            volumes=[volume],
-        )
-
-        mepp2_single_level_decompression_command = (
-            "set -x; /MEPP2/build/Examples/CGAL/Surface_mesh/progressive_decompression_filter_cgal_surface_mesh "
-            + "{{inputs.parameters.input_file}} "
-            + "{{inputs.parameters.output_basename}}{{inputs.parameters.batch_id}}.obj "
-            + "{{inputs.parameters.batch_id}}"
-        )
-
-        mepp2_single_level_decompression_level = Container(
-            name="mepp2-single-level-decompression",
-            inputs=[
-                Parameter(name="input_file"),
-                Parameter(name="output_basename"),
-                Parameter(name="batch_id"),
-            ],
-            image=environment.cluster.docker_registry
-            + "/"
-            + environment.cluster.docker_organisation
-            + "/"
-            + "mepp2:1.0",
-            image_pull_policy=models.ImagePullPolicy.always,
-            command=[
-                "bash",
-                "-c",
-                mepp2_single_level_decompression_command,
-            ],
-            volumes=[volume],
-        )
-
+        ### Proceed with a DAG workflow
         with DAG(name="main"):
+            t_main_0 = create_directory(
+                name="create-workflow-resulting-dir",
+                arguments={
+                    "directory_to_create": layout.workflow_resulting_dir(),
+                    "claim_name": environment.persisted_volume.claim_name,
+                    "mount_path": environment.persisted_volume.mount_path,
+                },
+            )
+
             t_main_1 = create_directory(
                 name="create-directory-blender-generate",
                 arguments={
@@ -409,6 +108,7 @@ if __name__ == "__main__":
                     "mount_path": environment.persisted_volume.mount_path,
                 },
             )
+            t_main_0 >> t_main_1
 
             # For the time being bpy (Python blender) won't work on
             # AppleSilicon (either in native M3 nor in amd64 emulated with
@@ -438,7 +138,7 @@ if __name__ == "__main__":
             #     ]
             # )
             #
-            t_main_2 = Task(name="blender-generate", template=blender_generate)
+            t_main_2 = Task(name="blender-generate", template=blender_generate_c)
             t_main_1 >> t_main_2
 
             t_main_3 = create_directory(
@@ -449,7 +149,7 @@ if __name__ == "__main__":
                     "mount_path": environment.persisted_volume.mount_path,
                 },
             )
-            t_main_4 = fix_obj_normals(
+            t_main_4 = fix_obj_normals_c(
                 arguments={
                     "input_file": layout.blender_generate_stage_output_filename(),
                     "output_file": layout.fix_obj_normals_stage_output_filename(),
@@ -465,7 +165,7 @@ if __name__ == "__main__":
                     "mount_path": environment.persisted_volume.mount_path,
                 },
             )
-            t_main_a_2 = mepp2_convert_obj_to_off(
+            t_main_a_2 = mepp2_convert_obj_to_off_c(
                 arguments={
                     "input_file": layout.fix_obj_normals_stage_output_filename(),
                     "output_file": layout.convert_obj_to_off_stage_output_filename(),
@@ -481,7 +181,7 @@ if __name__ == "__main__":
                     "mount_path": environment.persisted_volume.mount_path,
                 },
             )
-            t_main_a_4 = dgtal_from_off_to_hollow_vol(
+            t_main_a_4 = dgtal_from_off_to_hollow_vol_c(
                 name="mesh2vol",
                 arguments={
                     "input_file": layout.convert_obj_to_off_stage_output_filename(),
@@ -498,7 +198,7 @@ if __name__ == "__main__":
                     "mount_path": environment.persisted_volume.mount_path,
                 },
             )
-            t_main_a_a_2 = dgtal_from_hollow_to_filled_vol(
+            t_main_a_a_2 = dgtal_from_hollow_to_filled_vol_c(
                 arguments={
                     "input_file": layout.from_off_to_hollow_vol_stage_output_filename(),
                     "output_file": layout.from_hollow_to_filled_vol_stage_output_filename(),
@@ -514,7 +214,7 @@ if __name__ == "__main__":
                     "mount_path": environment.persisted_volume.mount_path,
                 },
             )
-            t_main_a_a_b_2 = dgtal_from_vol_to_raw_obj(
+            t_main_a_a_b_2 = dgtal_from_vol_to_raw_obj_c(
                 arguments={
                     "input_file": layout.from_hollow_to_filled_vol_stage_output_filename(),
                     "output_file": layout.from_vol_to_raw_obj_stage_output_filename(),
@@ -530,7 +230,7 @@ if __name__ == "__main__":
                     "mount_path": environment.persisted_volume.mount_path,
                 },
             )
-            t_main_a_a_a_2 = dgtal_from_vol_to_sdp(
+            t_main_a_a_a_2 = dgtal_from_vol_to_sdp_c(
                 arguments={
                     "input_file": layout.from_hollow_to_filled_vol_stage_output_filename(),
                     "output_file": layout.from_vol_to_sdp_stage_output_filename(),
@@ -546,7 +246,7 @@ if __name__ == "__main__":
                     "mount_path": environment.persisted_volume.mount_path,
                 },
             )
-            t_main_a_a_a_4 = convert_sdp_to_obj(
+            t_main_a_a_a_4 = convert_sdp_to_obj_c(
                 arguments={
                     "input_file": layout.from_vol_to_sdp_stage_output_filename(),
                     "output_file": layout.from_sdp_to_obj_stage_output_filename(),
@@ -580,7 +280,7 @@ if __name__ == "__main__":
                 },
             )
             t_main_a_a_a_4 >> t_main_a_a_a_5
-            t_main_a_a_a_6 = obj_to_obj_scale_offset(
+            t_main_a_a_a_6 = obj_to_obj_scale_offset_c(
                 arguments={
                     "scale": t_main_a_b_1.get_parameter("scale"),
                     "offset_x": t_main_a_b_1.get_parameter("offset_x"),
@@ -603,7 +303,7 @@ if __name__ == "__main__":
                 },
             )
             t_main_4 >> t_main_b_1
-            t_main_b_2 = mepp2_compress_obj(
+            t_main_b_2 = mepp2_compress_obj_c(
                 arguments={
                     "input_file": layout.fix_obj_normals_stage_output_filename(),
                     "output_file": layout.from_obj_to_bin_stage_output_filename(),
@@ -623,7 +323,7 @@ if __name__ == "__main__":
                 },
             )
             t_main_b_2 >> t_main_b_3
-            t_main_b_4 = mepp2_maximum_decompression_level(
+            t_main_b_4 = mepp2_maximum_decompression_c(
                 arguments={
                     "input_file": layout.from_obj_to_bin_stage_output_filename(),
                 }
@@ -644,19 +344,38 @@ if __name__ == "__main__":
             )
             t_main_b_4 >> t_main_b_5
 
-            t_main_b_6 = mepp2_single_level_decompression_level(
+            # Proceed with decompression with a parallel loop
+            # Note: refer here for a loop with a dynamically (unknown at
+            # submission stage) parametrized list as input
+            # https://hera.readthedocs.io/en/latest/examples/workflows/upstream/loops_param_result/
+            t_main_b_6 = mepp2_single_level_decompression_c(
                 name="decompress-loop",
                 arguments={
                     "input_file": layout.from_obj_to_bin_stage_output_filename(),
                     "output_basename": layout.from_bin_to_objs_stage_output_single_level_basename(),
                     "batch_id": "{{item}}",
                 },
-                # with_items=[1, 6, 18],
-                # FAIL with_items=[t_main_b_5.get_parameter("list_of_batches")],
-                # with_param=t_main_b_5.get_parameter("list_of_batches"),
                 with_param=t_main_b_5.result,
-                # with_items=["foo", "bar", "baz"]
             )
             t_main_b_5 >> t_main_b_6
 
+            t_main_b_7 = py3dtilers_objs_to_3dtiles_c(
+                name="py3dtilers-objs-to-3dtiles",
+                arguments={
+                    "input_directory": layout.from_bin_to_objs_stage_output_dir(),
+                    "output_directory": layout.workflow_resulting_dir(),
+                },
+            )
+            t_main_0 >> t_main_b_7
+            t_main_b_6 >> t_main_b_7
+
+            # FIXME py3dtilers  obj-tiler -i /datademo/LODs -o /datademo/lods_3dtiles --as_lods  --offset $GEO_OFFSET  --geometric_error  0.10  0.45  0.75  1.05
+
     w.create()
+
+    ### What is missing
+    # The demo back-ends (tunnetview and 3dtiles-sample daemon tasks) must be
+    # killed at some point. If there was only the tunnetview back end, we could
+    # modify it to add a route URL that triggers an exit of the request server
+    # which would have the pod to be dropped. But this wouldn't solve the
+    # the 3dtiles-sample server.

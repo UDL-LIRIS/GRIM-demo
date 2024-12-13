@@ -1,5 +1,6 @@
 import types
 from hera_k8s_utils.num_exp_environment import num_exp_environment, Struct
+from hera.workflows import ExistingVolume
 
 
 class environment(num_exp_environment):
@@ -32,3 +33,10 @@ class environment(num_exp_environment):
         # should be dealt by the (Experiment) Conductor (refer to
         # https://gitlab.liris.cnrs.fr/expedata/expe-data-project/-/blob/master/lexicon.md#conductor )
         self.persisted_volume.mount_path = "/within-container-mount-point"
+
+        # Eventually we keep a reference to the actual (k8s) volume objet
+        self.persisted_volume.volume = ExistingVolume(
+            claim_name=self.persisted_volume.claim_name,
+            name="dummy",
+            mount_path=self.persisted_volume.mount_path,
+        )
