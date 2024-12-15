@@ -369,8 +369,6 @@ if __name__ == "__main__":
             t_main_0 >> t_main_b_7
             t_main_b_6 >> t_main_b_7
 
-            # FIXME py3dtilers  obj-tiler -i /datademo/LODs -o /datademo/lods_3dtiles --as_lods  --offset $GEO_OFFSET  --geometric_error  0.10  0.45  0.75  1.05
-
     w.create()
 
     ### What is missing

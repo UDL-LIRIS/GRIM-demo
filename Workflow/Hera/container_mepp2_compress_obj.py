@@ -20,7 +20,7 @@ def define_mepp2_compress_obj_container(environment):
             "0",
             "{{inputs.parameters.output_file}}",
             '""',
-            # FIXME: only Vincent Vidal knows why the following parameters
+            # Note: only Vincent Vidal knows why the following parameters
             # do work (as opposed to other values). Black magic (a.k.a.
             # non reproducible thingies rule the numerical world :-( )
             "1 0 0 70 -1 0 12",

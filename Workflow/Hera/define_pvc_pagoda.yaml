@@ -1,7 +1,7 @@
 ---
-# In the PAGoDA cluster context, there is no need to define the underlying Persistent
-# Volume of the following PVC. This is because the the PV will be automagically
-# created by the platform (FIXME: document the mechanism).
+# In the PAGoDA cluster context, there is no need to define the underlying 
+# Persistent Volume of the following PVC. This is because the PV will be 
+# auto-magically created by the platform.
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
