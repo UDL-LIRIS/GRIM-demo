@@ -41,7 +41,6 @@ docker system info --format '{{.Architecture}}'
 
 whose **result must be `x86_64`**.
 
-
 ```bash
 export REGISTRY=harbor.pagoda.os.univ-lyon1.fr
 export REGISTRY_GROUP=vcity
@@ -63,6 +62,7 @@ docker_build -t ${ORGANISATION}/mepp2:1.0                      `git rev-parse --
 docker_build -t ${ORGANISATION}/dgtal:1.0                      `git rev-parse --show-toplevel`/Docker/DgtalContext
 docker_build -t ${ORGANISATION}/convertsdptoobj:1.0            `git rev-parse --show-toplevel`/Docker/ConvertSdpToObjContext
 docker_build -t ${ORGANISATION}/objtoobjscaleoffset:1.0        `git rev-parse --show-toplevel`/Docker/ObjToObjScaleOffsetContext
+docker_build -t ${ORGANISATION}/3dtiles-server:1.0             `git rev-parse --show-toplevel`/Docker/ThreeDTilesSamplesContext
 ```
 
 ```bash
@@ -76,6 +76,7 @@ docker tag ${ORGANISATION}/mepp2:1.0                      ${REGISTRY}/${ORGANISA
 docker tag ${ORGANISATION}/dgtal:1.0                      ${REGISTRY}/${ORGANISATION}/dgtal:1.0
 docker tag ${ORGANISATION}/convertsdptoobj:1.0            ${REGISTRY}/${ORGANISATION}/convertsdptoobj:1.0
 docker tag ${ORGANISATION}/objtoobjscaleoffset:1.0        ${REGISTRY}/${ORGANISATION}/objtoobjscaleoffset:1.0
+docker tag ${ORGANISATION}/3dtiles-server:1.0             ${REGISTRY}/${ORGANISATION}/3dtiles-server:1.0
 ```
 
 ```bash
@@ -89,6 +90,7 @@ docker push ${REGISTRY}/${ORGANISATION}/mepp2:1.0
 docker push ${REGISTRY}/${ORGANISATION}/dgtal:1.0
 docker push ${REGISTRY}/${ORGANISATION}/convertsdptoobj:1.0
 docker push ${REGISTRY}/${ORGANISATION}/objtoobjscaleoffset:1.0
+docker push ${REGISTRY}/${ORGANISATION}/3dtiles-server:1.0
 ```
 
 ## Allocating cluster level Workflow ressources

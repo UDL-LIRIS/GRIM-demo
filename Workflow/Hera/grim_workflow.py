@@ -50,6 +50,8 @@ if __name__ == "__main__":
     from script_extract_list_of_evenly_distributed_batches import (
         extract_list_of_evenly_distributed_batches,
     )
+    from script_write_geo_offset import write_geo_offset
+    from script_check_final_result import check_final_result
 
     args = parser().parse_args()
     environment = environment(args)
@@ -91,6 +93,14 @@ if __name__ == "__main__":
 
         ### Proceed with a DAG workflow
         with DAG(name="main"):
+            t_final = check_final_result(
+                name="final-data-check",
+                arguments={
+                    "directory_to_check": layout.workflow_resulting_dir(),
+                    "claim_name": environment.persisted_volume.claim_name,
+                    "mount_path": environment.persisted_volume.mount_path,
+                },
+            )
             t_main_0 = create_directory(
                 name="create-workflow-resulting-dir",
                 arguments={
@@ -271,16 +281,7 @@ if __name__ == "__main__":
             )
             t_main_a_b_1 >> t_main_a_b_debug
 
-            t_main_a_a_a_5 = create_directory(
-                name="create-directory-from-obj-to-rescaled-obj",
-                arguments={
-                    "directory_to_create": layout.from_obj_to_rescaled_obj_stage_output_dir(),
-                    "claim_name": environment.persisted_volume.claim_name,
-                    "mount_path": environment.persisted_volume.mount_path,
-                },
-            )
-            t_main_a_a_a_4 >> t_main_a_a_a_5
-            t_main_a_a_a_6 = obj_to_obj_scale_offset_c(
+            t_main_a_a_a_5 = obj_to_obj_scale_offset_c(
                 arguments={
                     "scale": t_main_a_b_1.get_parameter("scale"),
                     "offset_x": t_main_a_b_1.get_parameter("offset_x"),
@@ -290,8 +291,9 @@ if __name__ == "__main__":
                     "output_file": layout.from_obj_to_rescaled_obj_stage_output_filename(),
                 }
             )
-            t_main_a_a_a_5 >> t_main_a_a_a_6
-            t_main_a_b_1 >> t_main_a_a_a_6
+            t_main_a_a_a_4 >> t_main_a_a_a_5
+            t_main_a_b_1 >> t_main_a_a_a_5
+            t_main_a_a_a_5 >> t_final
 
             ####################### Compression of triangulation
             t_main_b_1 = create_directory(
@@ -368,6 +370,22 @@ if __name__ == "__main__":
             )
             t_main_0 >> t_main_b_7
             t_main_b_6 >> t_main_b_7
+            t_main_b_7 >> t_final
+
+            ### Writing the geo-offsets to the resulting directory
+            t_main_c = write_geo_offset(
+                name="write-geo-offset",
+                arguments={
+                    "geo_offsets_list": inputs.parameters.geo_offset,
+                    "output_filename": os.path.join(
+                        layout.workflow_resulting_dir(), "geo_offset.txt"
+                    ),
+                    "claim_name": environment.persisted_volume.claim_name,
+                    "mount_path": environment.persisted_volume.mount_path,
+                },
+            )
+            t_main_0 >> t_main_c
+            t_main_c >> t_final
 
     w.create()
 

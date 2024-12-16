@@ -19,6 +19,11 @@ class layout:
     def stage_output_dir(self, stage_output_dir):
         return os.path.join(self.experiment_absolute_output_dir, stage_output_dir)
 
+    #### The resulting directory regroups the skeleton, the generated tileset
+    # as well as the geographic offset
+    def workflow_resulting_dir(self):
+        return self.stage_output_dir("stage_3_data_final")
+
     ###### Generate the initial cave with Blender
     def blender_generate_stage_output_dir(self):
         return self.stage_output_dir("stage_0_5_blender_generate")
@@ -108,14 +113,11 @@ class layout:
         return os.path.join(self.from_sdp_to_obj_stage_output_dir(), filename)
 
     # OBJ to rescaled OBJ
-    def from_obj_to_rescaled_obj_stage_output_dir(self):
-        return self.stage_output_dir("stage_1_2_3_from_OBJ_to_rescaled_OBJ")
-
+    # Note: the result of this stage is the workflow resulting directory. There
+    # is thus no need to created a specific output directory.
     def from_obj_to_rescaled_obj_stage_output_filename(self):
-        input_filename = self.from_sdp_to_obj_stage_output_filename()
-        stem_filename = Path(input_filename).stem
-        filename = stem_filename + "_rescaled.obj"
-        return os.path.join(self.from_obj_to_rescaled_obj_stage_output_dir(), filename)
+        filename = "skeleton.obj"
+        return os.path.join(self.workflow_resulting_dir(), filename)
 
     ### Triangulation compression (OBJ to BIN)
     # OBJ to BIN
@@ -136,8 +138,3 @@ class layout:
         filename = self.from_obj_to_bin_stage_output_filename()
         stem_filename = Path(filename).stem
         return os.path.join(self.from_bin_to_objs_stage_output_dir(), stem_filename)
-
-    #### The resulting directory regroups the skeleton, the generated tileset
-    # as well as the geographic offset
-    def workflow_resulting_dir(self):
-        return self.stage_output_dir("stage_3_data_final")
