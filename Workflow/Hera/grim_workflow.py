@@ -4,54 +4,17 @@ if __name__ == "__main__":
     # seen and used from within the Argo server engine (at Workflow runtime)
     from hera.workflows import (
         DAG,
+        Resource,
         Task,
         Workflow,
     )
 
-    import os
     from parser import parser
     from layout import layout
     from environment import environment
     from inputs import inputs
-
-    ### Containers definitions
-    from container_blender_generate import define_blender_generate_container
-    from container_fix_obj_normals import define_fix_obj_normals_container
-    from container_mepp2_convert_obj_to_off import define_mepp2_convert_obj_to_off
-    from container_dgtal_from_off_to_hollow_vol import (
-        define__dgtal_from_off_to_hollow_vol_container,
-    )
-    from container_dgtal_from_hollow_to_filled_vol import (
-        define_dgtal_from_hollow_to_filled_vol_container,
-    )
-    from container_dgtal_from_vol_to_raw_obj import (
-        define_dgtal_from_vol_to_raw_obj_container,
-    )
-    from container_dgtal_from_vol_to_sdp import define_dgtal_from_vol_to_sdp_container
-    from container_convert_sdp_to_obj import define_convert_sdp_to_obj_container
-    from container_obj_to_obj_scale_offset import (
-        define_obj_to_obj_scale_offset_container,
-    )
-    from container_mepp2_compress_obj import define_mepp2_compress_obj_container
-    from container_mepp2_maximum_decompression_level import (
-        define_mepp2_maximum_decompression_container,
-    )
-    from container_mepp2_single_level_decompression import (
-        define_mepp2_single_level_decompression_container,
-    )
-    from container_py3dtilers_objs_to_3dtiles import (
-        define_py3dtilers_objs_to_3dtiles_container,
-    )
-
-    ### Scripts definitions
-    from script_create_directory import create_directory
-    from script_debug import debug
-    from script_extract_mesh2vol_outputs import extract_mesh2vol_outputs
-    from script_extract_list_of_evenly_distributed_batches import (
-        extract_list_of_evenly_distributed_batches,
-    )
-    from script_write_geo_offset import write_geo_offset
-    from script_check_final_result import check_final_result
+    from Containers import *  # Containers definitions
+    from Scripts import *  # Scripts definitions
 
     args = parser().parse_args()
     environment = environment(args)
@@ -60,7 +23,11 @@ if __name__ == "__main__":
     ### From now on, the only variables that must be used should be derived
     # (or based-on) the environment, layout and inputs variables
 
-    with Workflow(generate_name="grim-workflow-", entrypoint="main") as w:
+    with Workflow(
+        generate_name="grim-workflow-",
+        entrypoint="main",
+        volumes=[environment.persisted_volume.volume],
+    ) as w:
 
         #### Container definitions (must be within Workflow context)
         blender_generate_c = define_blender_generate_container(environment, layout)
@@ -90,10 +57,35 @@ if __name__ == "__main__":
         py3dtilers_objs_to_3dtiles_c = define_py3dtilers_objs_to_3dtiles_container(
             environment, inputs
         )
+        http_serve_resulting_data_c = define_http_serve_resulting_data_container(
+            environment
+        )
+
+        tf_jobtmpl = Resource(
+            name="tf-jobtmpl",
+            action="create",
+            manifest="""apiVersion: v1
+kind: Service
+metadata:
+    name: demogrim-resulting-data-http-service
+spec:
+    type: ClusterIP
+    selector:
+        app: nginx-server-container
+    ports:
+    - protocol:   TCP
+      port:       80
+      targetPort: 80
+""",
+        )
 
         ### Proceed with a DAG workflow
         with DAG(name="main"):
-            t_final = check_final_result(
+            # The final task of the data production pipeline. The tasks
+            # following t_data_final are dedicated to using/exploring that
+            # resulting data
+
+            t_data_final = check_final_result(
                 name="final-data-check",
                 arguments={
                     "directory_to_check": layout.workflow_resulting_dir(),
@@ -101,6 +93,10 @@ if __name__ == "__main__":
                     "mount_path": environment.persisted_volume.mount_path,
                 },
             )
+            # WIP
+            # junk_t = Task(name="junk", template=tf_jobtmpl.name)
+            # junk_t >> t_data_final
+
             t_main_0 = create_directory(
                 name="create-workflow-resulting-dir",
                 arguments={
@@ -293,7 +289,7 @@ if __name__ == "__main__":
             )
             t_main_a_a_a_4 >> t_main_a_a_a_5
             t_main_a_b_1 >> t_main_a_a_a_5
-            t_main_a_a_a_5 >> t_final
+            t_main_a_a_a_5 >> t_data_final
 
             ####################### Compression of triangulation
             t_main_b_1 = create_directory(
@@ -370,7 +366,7 @@ if __name__ == "__main__":
             )
             t_main_0 >> t_main_b_7
             t_main_b_6 >> t_main_b_7
-            t_main_b_7 >> t_final
+            t_main_b_7 >> t_data_final
 
             ### Writing the geo-offsets to the resulting directory
             t_main_c = write_geo_offset(
@@ -385,7 +381,20 @@ if __name__ == "__main__":
                 },
             )
             t_main_0 >> t_main_c
-            t_main_c >> t_final
+            t_main_c >> t_data_final
+
+            ####################### Using the computed data
+            t_use_data = http_serve_resulting_data_c(
+                name="http-serve-resulting-data-task",
+                arguments={
+                    "exposed_dir_subpath": layout.relative_workflow_resulting_dir(),
+                },
+            )
+            t_data_final >> t_use_data
+            t_use_data_debug = debug(arguments={"message": t_use_data.ip})
+            t_use_data >> t_use_data_debug
+            t_sleep = sleep(arguments={"delay": 300})  # Sleep 3'
+            t_use_data_debug >> t_sleep
 
     w.create()
 

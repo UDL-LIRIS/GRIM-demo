@@ -10,19 +10,28 @@ class layout:
     """
 
     def __init__(self, inputs, environment) -> None:
+        self.experiment_output_dir = inputs.constants.experiment_output_dir
         self.experiment_absolute_output_dir = os.path.join(
             environment.persisted_volume.mount_path,
-            inputs.constants.experiment_output_dir,
+            self.experiment_output_dir,
         )
         self.subdivision = inputs.parameters.subdivision_level
+        self.mount_path = environment.persisted_volume.mount_path
 
     def stage_output_dir(self, stage_output_dir):
         return os.path.join(self.experiment_absolute_output_dir, stage_output_dir)
 
     #### The resulting directory regroups the skeleton, the generated tileset
     # as well as the geographic offset
+    def relative_workflow_resulting_dir(self):
+        """
+        This directory path is relative to the experiment output directory
+        as opposed to the absolute path used as mount_path
+        """
+        return os.path.join(self.experiment_output_dir, "stage_3_data_final")
+
     def workflow_resulting_dir(self):
-        return self.stage_output_dir("stage_3_data_final")
+        return os.path.join(self.mount_path, self.relative_workflow_resulting_dir())
 
     ###### Generate the initial cave with Blender
     def blender_generate_stage_output_dir(self):

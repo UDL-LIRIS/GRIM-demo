@@ -62,7 +62,7 @@ docker_build -t ${ORGANISATION}/mepp2:1.0                      `git rev-parse --
 docker_build -t ${ORGANISATION}/dgtal:1.0                      `git rev-parse --show-toplevel`/Docker/DgtalContext
 docker_build -t ${ORGANISATION}/convertsdptoobj:1.0            `git rev-parse --show-toplevel`/Docker/ConvertSdpToObjContext
 docker_build -t ${ORGANISATION}/objtoobjscaleoffset:1.0        `git rev-parse --show-toplevel`/Docker/ObjToObjScaleOffsetContext
-docker_build -t ${ORGANISATION}/3dtiles-server:1.0             `git rev-parse --show-toplevel`/Docker/ThreeDTilesSamplesContext
+docker image pull --platform linux/amd64 nginx:1.27
 ```
 
 ```bash
@@ -77,6 +77,7 @@ docker tag ${ORGANISATION}/dgtal:1.0                      ${REGISTRY}/${ORGANISA
 docker tag ${ORGANISATION}/convertsdptoobj:1.0            ${REGISTRY}/${ORGANISATION}/convertsdptoobj:1.0
 docker tag ${ORGANISATION}/objtoobjscaleoffset:1.0        ${REGISTRY}/${ORGANISATION}/objtoobjscaleoffset:1.0
 docker tag ${ORGANISATION}/3dtiles-server:1.0             ${REGISTRY}/${ORGANISATION}/3dtiles-server:1.0
+docker tag nginx:1.27                                     ${REGISTRY}/${ORGANISATION}/nginx:1.27 
 ```
 
 ```bash
@@ -91,6 +92,7 @@ docker push ${REGISTRY}/${ORGANISATION}/dgtal:1.0
 docker push ${REGISTRY}/${ORGANISATION}/convertsdptoobj:1.0
 docker push ${REGISTRY}/${ORGANISATION}/objtoobjscaleoffset:1.0
 docker push ${REGISTRY}/${ORGANISATION}/3dtiles-server:1.0
+docker push ${REGISTRY}/${ORGANISATION}/nginx:1.27
 ```
 
 ## Allocating cluster level Workflow ressources

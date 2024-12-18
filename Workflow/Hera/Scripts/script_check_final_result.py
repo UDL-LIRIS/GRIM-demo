@@ -65,4 +65,29 @@ def check_final_result(
         print("Exiting.")
         sys.exit(1)
 
+    # Because this directory will be later on server by nginx, that requires
+    # (by default) an index.html file, generate that file:
+    with open(os.path.join(directory_to_check, "index.html"), "w") as f:
+
+        html_content = (
+            "<html>\n"
+            "<head>\n"
+            "<title>Grim workflow results</title>"
+            "</head>\n"
+            '<body BGCOLOR="#FFFFFF" bgproperties="fixed">\n'
+            "<b>Files</b>:\n"
+            "<ul>\n"
+            "<li>\n"
+            '[<a href="./geo_offset.txt">geo_offset.txt</a>]\n'
+            "</li>\n"
+            "<li>\n"
+            '[<a href="./skeleton.obj">skeleton.obj</a>]\n'
+            "</li>\n"
+            "<li>\n"
+            '[<a href="./tileset.json">tileset.json</a>]\n'
+            "</li>\n"
+            "</body>\n"
+            "</html>\n"
+        )
+        f.write(html_content)
     print("Final results seems to have all its components.")
