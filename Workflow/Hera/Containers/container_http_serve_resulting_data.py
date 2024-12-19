@@ -1,4 +1,4 @@
-from hera.workflows import Container, Label, models, Parameter
+from hera.workflows import Container, models, Parameter, Resource
 
 
 def define_http_serve_resulting_data_container(environment):
@@ -10,7 +10,7 @@ def define_http_serve_resulting_data_container(environment):
             Parameter(name="exposed_dir_subpath"),
         ],
         daemon=True,
-        labels=Label(key="app", value="nginx-server-container"),
+        labels={"app": "nginx-server-container"},
         image=environment.cluster.docker_registry
         + "/"
         + environment.cluster.docker_organisation
@@ -42,3 +42,63 @@ def define_http_serve_resulting_data_container(environment):
             )
         ],
     )
+
+
+def define_http_serve_resulting_data_create_service_resource():
+    """Returns the Resource that creates the (k8s) Service exposing the pod
+    port to the clusterIP (network of nodes)
+    """
+    manifest = """apiVersion: v1
+kind: Service
+metadata:
+    name: demogrim-resulting-data-http-service
+spec:
+    type: ClusterIP
+    selector:
+        service: demogrim-nginx-server-container
+    ports:
+    - protocol:   TCP
+      port:       80
+      targetPort: 80
+"""
+
+    return Resource(
+        name="create-resulting-data-http-service", action="create", manifest=manifest
+    )
+
+
+def define_http_serve_resulting_data_delete_service_resource():
+    """Returns the Resource that deletes the (k8s) Service exposing the pod
+    port to the clusterIP (network of nodes)
+    """
+    return Resource(
+        name="delete-resulting-data-http-service",
+        action="delete",
+        flags=["service", "--selector", "service=demogrim-nginx-server-container"],
+    )
+
+
+### References
+# https://kubernetes.io/docs/tutorials/services/connect-applications-service/
+# https://kubernetes.io/docs/concepts/services-networking/ingress/
+
+############################################################################
+# Debugging notes
+#
+##### Assert directly (as opposed to through the readiness_probe) that the
+# container is indeed listening on 80:
+# CONTAINER_NAME=`kubectl get pods -l app=nginx-server-container --field-selector=status.phase==Running --output=jsonpath={.items..metadata.name}`
+# kubectl get pod ${CONTAINER_NAME}
+# kubectl exec --stdin --tty ${CONTAINER_NAME} -- apt update
+# kubectl exec --stdin --tty  ${CONTAINER_NAME} -- apt install net-tools
+# kubectl exec --stdin --tty  ${CONTAINER_NAME} -- netstat -pln
+#   \-----> should return a LISTEN on 80
+#
+##### Get the container IP
+# kubectl get pod ${CONTAINER_NAME} --output=jsonpath={.status.podIPs}
+#
+##### Check the service is running
+# kubectl apply -f resulting_data_http_service.yml
+# kubectl get service demogrim-resulting-data-http-service
+#    If you try to open the podIP on port 80 then nothing is displayed
+#

@@ -4,11 +4,11 @@ if __name__ == "__main__":
     # seen and used from within the Argo server engine (at Workflow runtime)
     from hera.workflows import (
         DAG,
-        Resource,
         Task,
         Workflow,
     )
 
+    import os
     from parser import parser
     from layout import layout
     from environment import environment
@@ -60,23 +60,11 @@ if __name__ == "__main__":
         http_serve_resulting_data_c = define_http_serve_resulting_data_container(
             environment
         )
-
-        tf_jobtmpl = Resource(
-            name="tf-jobtmpl",
-            action="create",
-            manifest="""apiVersion: v1
-kind: Service
-metadata:
-    name: demogrim-resulting-data-http-service
-spec:
-    type: ClusterIP
-    selector:
-        app: nginx-server-container
-    ports:
-    - protocol:   TCP
-      port:       80
-      targetPort: 80
-""",
+        create_resulting_data_http_service_r = (
+            define_http_serve_resulting_data_create_service_resource()
+        )
+        delete_resulting_data_http_service_r = (
+            define_http_serve_resulting_data_delete_service_resource()
         )
 
         ### Proceed with a DAG workflow
@@ -93,9 +81,6 @@ spec:
                     "mount_path": environment.persisted_volume.mount_path,
                 },
             )
-            # WIP
-            # junk_t = Task(name="junk", template=tf_jobtmpl.name)
-            # junk_t >> t_data_final
 
             t_main_0 = create_directory(
                 name="create-workflow-resulting-dir",
@@ -384,23 +369,40 @@ spec:
             t_main_c >> t_data_final
 
             ####################### Using the computed data
-            t_use_data = http_serve_resulting_data_c(
+            t_use_data_1 = http_serve_resulting_data_c(
                 name="http-serve-resulting-data-task",
                 arguments={
                     "exposed_dir_subpath": layout.relative_workflow_resulting_dir(),
                 },
             )
-            t_data_final >> t_use_data
-            t_use_data_debug = debug(arguments={"message": t_use_data.ip})
-            t_use_data >> t_use_data_debug
-            t_sleep = sleep(arguments={"delay": 300})  # Sleep 3'
-            t_use_data_debug >> t_sleep
+            t_data_final >> t_use_data_1
+
+            # WIP
+            # Waiting for the ArgoServer to have the rights to create a Service
+            # at the k8s level. For the time being one gets the following
+            # error message
+            #    services is forbidden: User "system:serviceaccount:argo-dev:argo-workflow"
+            #    cannot create resource "services" in API group "" in the
+            #    namespace "argo-dev"
+            #
+            # t_use_data_2 = Task(
+            #     name="create-http-serve-service",
+            #     template=create_resulting_data_http_service_r.name,
+            # )
+            # t_use_data_1 >> t_use_data_2
+
+            # The http_serve_resulting_data_c is launched as a deamon that will
+            # be terminated as soon as the last task of the workflow is finished.
+            # The purpose of the sleep task is thus to keep the http servers
+            # alive long enough for a reasonable delay (that is a delay allowing
+            # the final user to interacts with the data web viewer):
+            # t_sleep = sleep(arguments={"delay": 120})  # Sleep delay in seconds
+            # t_use_data_2 >> t_sleep
+
+            # t_use_data_3 = Task(
+            #     name="delete-http-serve-service",
+            #     template=delete_resulting_data_http_service_r.name,
+            # )
+            # t_use_data_2 >> t_use_data_3
 
     w.create()
-
-    ### What is missing
-    # The demo back-ends (tunnetview and 3dtiles-sample daemon tasks) must be
-    # killed at some point. If there was only the tunnetview back end, we could
-    # modify it to add a route URL that triggers an exit of the request server
-    # which would have the pod to be dropped. But this wouldn't solve the
-    # the 3dtiles-sample server.
