@@ -28,7 +28,8 @@ from .container_py3dtilers_objs_to_3dtiles import (
 from .container_http_serve_resulting_data import (
     define_http_serve_resulting_data_container,
     define_http_serve_resulting_data_create_service_resource,
-    define_http_serve_resulting_data_delete_service_resource,
+    define_http_serve_resulting_data_create_ingress_resource,
+    define_http_serve_resulting_data_delete_resources,
 )
 
 __all__ = [
@@ -47,5 +48,6 @@ __all__ = [
     "define_py3dtilers_objs_to_3dtiles_container",
     "define_http_serve_resulting_data_container",
     "define_http_serve_resulting_data_create_service_resource",
-    "define_http_serve_resulting_data_delete_service_resource",
+    "define_http_serve_resulting_data_create_ingress_resource",
+    "define_http_serve_resulting_data_delete_resources",
 ]

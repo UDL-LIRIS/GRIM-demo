@@ -69,9 +69,47 @@ spec:
     )
 
 
-def define_http_serve_resulting_data_delete_service_resource():
-    """Returns the Resource that deletes the (k8s) Service exposing the pod
-    port to the clusterIP (network of nodes)
+def define_http_serve_resulting_data_create_ingress_resource():
+    """
+    Returns the Resource that creates the (k8s) Ingress exposing the
+    Service to the cluster extranet
+    """
+    manifest = """apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: demogrim-resulting-data-http-ingress
+  labels:
+    cleanup: "true"
+  annotations:
+    # automatically creates the tls certificate
+    cert-manager.io/cluster-issuer: letsencrypt-pagoda3-prod
+spec:
+  ingressClassName: traefik
+  tls:
+  - hosts:
+    - data-http.demogrim.pagoda.liris.cnrs.fr
+    secretName: demogrim-3dtiles-server-tls-secret
+  rules:
+  - host: data-http.demogrim.pagoda.liris.cnrs.fr
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: demogrim-resulting-data-http-service
+            port:
+              number: 80
+"""
+    return Resource(
+        name="create-resulting-data-http-ingress", action="apply", manifest=manifest
+    )
+
+
+def define_http_serve_resulting_data_delete_resources():
+    """
+    Delete the (k8s) Resources exposing the pod to the cluster extranet
+    (that is the Resources with a "cleanup=true" label)
     """
     return Resource(
         name="delete-resulting-data-http-service",

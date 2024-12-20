@@ -1,10 +1,13 @@
-from hera.workflows import Container, models
+from hera.workflows import Container, models, Parameter
 
 
 def define_blender_generate_container(environment, layout):
     # Reference: https://github.com/VCityTeam/UD-Reproducibility/blob/master/Computations/3DTiles/Ribs/Readme.md#for-the-cave-system
     return Container(
         name="blender-generate",
+        inputs=[
+            Parameter(name="subdivision_level"),
+        ],
         image=environment.cluster.docker_registry
         + "/"
         + environment.cluster.docker_organisation
@@ -16,7 +19,7 @@ def define_blender_generate_container(environment, layout):
             "Cave.py",
             "-v",
             "--subdivision",
-            "1",
+            "{{inputs.parameters.subdivision_level}}",
             "--fill_holes",
             "True",
             "--outputdir",

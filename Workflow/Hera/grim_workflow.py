@@ -63,8 +63,11 @@ if __name__ == "__main__":
         create_resulting_data_http_service_r = (
             define_http_serve_resulting_data_create_service_resource()
         )
-        delete_resulting_data_http_service_r = (
-            define_http_serve_resulting_data_delete_service_resource()
+        create_resulting_data_http_ingress_r = (
+            define_http_serve_resulting_data_create_ingress_resource()
+        )
+        delete_resulting_data_http_resources_r = (
+            define_http_serve_resulting_data_delete_resources()
         )
 
         ### Proceed with a DAG workflow
@@ -129,7 +132,13 @@ if __name__ == "__main__":
             #     ]
             # )
             #
-            t_main_2 = Task(name="blender-generate", template=blender_generate_c)
+            t_main_2 = Task(
+                name="blender-generate",
+                template=blender_generate_c,
+                arguments={
+                    "subdivision_level": inputs.parameters.subdivision_level,
+                },
+            )
             t_main_1 >> t_main_2
 
             t_main_3 = create_directory(
@@ -378,24 +387,30 @@ if __name__ == "__main__":
             t_data_final >> t_use_data_1
 
             t_use_data_2 = Task(
-                name="create-http-serve-service",
+                name="create-http-serve-service-t",
                 template=create_resulting_data_http_service_r.name,
             )
             t_use_data_1 >> t_use_data_2
+
+            t_use_data_3 = Task(
+                name="create-http-serve-ingress-t",
+                template=create_resulting_data_http_ingress_r.name,
+            )
+            # FIXME t_use_data_2 >> t_use_data_3
 
             # The http_serve_resulting_data_c is launched as a daemon that will
             # be terminated as soon as the last task of the workflow is finished.
             # The purpose of the sleep task is thus to keep the http servers
             # alive long enough for a reasonable delay (that is a delay allowing
             # the final user to interacts with the data web viewer):
-            t_sleep = sleep(arguments={"delay": 120})  # Sleep delay in seconds
-            t_use_data_2 >> t_sleep
+            t_sleep = sleep(arguments={"delay": 1200})  # Sleep delay in seconds
+            t_use_data_2 >> t_sleep  # FIXME should be 3
 
             # Cleaning up Resources that are no longer necessary
-            t_use_data_3 = Task(
-                name="delete-http-serve-service",
-                template=delete_resulting_data_http_service_r.name,
+            t_use_data_4 = Task(
+                name="delete-http-serve-resources-t",
+                template=delete_resulting_data_http_resources_r.name,
             )
-            t_sleep >> t_use_data_3
+            t_sleep >> t_use_data_4
 
     w.create()
