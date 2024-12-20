@@ -377,32 +377,25 @@ if __name__ == "__main__":
             )
             t_data_final >> t_use_data_1
 
-            # WIP
-            # Waiting for the ArgoServer to have the rights to create a Service
-            # at the k8s level. For the time being one gets the following
-            # error message
-            #    services is forbidden: User "system:serviceaccount:argo-dev:argo-workflow"
-            #    cannot create resource "services" in API group "" in the
-            #    namespace "argo-dev"
-            #
-            # t_use_data_2 = Task(
-            #     name="create-http-serve-service",
-            #     template=create_resulting_data_http_service_r.name,
-            # )
-            # t_use_data_1 >> t_use_data_2
+            t_use_data_2 = Task(
+                name="create-http-serve-service",
+                template=create_resulting_data_http_service_r.name,
+            )
+            t_use_data_1 >> t_use_data_2
 
-            # The http_serve_resulting_data_c is launched as a deamon that will
+            # The http_serve_resulting_data_c is launched as a daemon that will
             # be terminated as soon as the last task of the workflow is finished.
             # The purpose of the sleep task is thus to keep the http servers
             # alive long enough for a reasonable delay (that is a delay allowing
             # the final user to interacts with the data web viewer):
-            # t_sleep = sleep(arguments={"delay": 120})  # Sleep delay in seconds
-            # t_use_data_2 >> t_sleep
+            t_sleep = sleep(arguments={"delay": 120})  # Sleep delay in seconds
+            t_use_data_2 >> t_sleep
 
-            # t_use_data_3 = Task(
-            #     name="delete-http-serve-service",
-            #     template=delete_resulting_data_http_service_r.name,
-            # )
-            # t_use_data_2 >> t_use_data_3
+            # Cleaning up Resources that are no longer necessary
+            t_use_data_3 = Task(
+                name="delete-http-serve-service",
+                template=delete_resulting_data_http_service_r.name,
+            )
+            t_sleep >> t_use_data_3
 
     w.create()

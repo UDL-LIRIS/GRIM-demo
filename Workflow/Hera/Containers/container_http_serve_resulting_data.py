@@ -52,10 +52,12 @@ def define_http_serve_resulting_data_create_service_resource():
 kind: Service
 metadata:
     name: demogrim-resulting-data-http-service
+    labels:
+        cleanup: "true"
 spec:
     type: ClusterIP
     selector:
-        service: demogrim-nginx-server-container
+        app: nginx-server-container
     ports:
     - protocol:   TCP
       port:       80
@@ -63,7 +65,7 @@ spec:
 """
 
     return Resource(
-        name="create-resulting-data-http-service", action="create", manifest=manifest
+        name="create-resulting-data-http-service", action="apply", manifest=manifest
     )
 
 
@@ -74,13 +76,14 @@ def define_http_serve_resulting_data_delete_service_resource():
     return Resource(
         name="delete-resulting-data-http-service",
         action="delete",
-        flags=["service", "--selector", "service=demogrim-nginx-server-container"],
+        flags=["service", "--selector", "cleanup=true"],
     )
 
 
 ### References
 # https://kubernetes.io/docs/tutorials/services/connect-applications-service/
 # https://kubernetes.io/docs/concepts/services-networking/ingress/
+# https://github.com/argoproj-labs/hera/blob/main/docs/examples/workflows/upstream/resource_delete_with_flags.md
 
 ############################################################################
 # Debugging notes
